@@ -3,7 +3,7 @@
 import os
 from flask import Flask, g, send_from_directory
 
-from app.db import get_connection, init_schema, query_one, execute
+from app.db import get_connection, init_schema, migrate_order_status_schema, query_one, execute
 from app.auth import hash_password
 from app.sessions import prune_expired_sessions
 
@@ -56,6 +56,7 @@ def create_app():
     from app.routes.employees import bp as employees_bp
     from app.routes.deals import bp as deals_bp
     from app.routes.collections import bp as collections_bp
+    from app.routes.notifications import bp as notifications_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(products_bp)
@@ -67,6 +68,7 @@ def create_app():
     app.register_blueprint(employees_bp)
     app.register_blueprint(deals_bp)
     app.register_blueprint(collections_bp)
+    app.register_blueprint(notifications_bp)
 
     # ---- Serve the frontend (public/) as static files ----------------------
     @app.route('/', defaults={'path': 'index.html'})
@@ -90,6 +92,7 @@ def create_app():
         conn = get_connection()
         init_schema(conn)
         ensure_schema_compatibility(conn)
+        migrate_order_status_schema(conn)
         seed_data(conn)
         prune_expired_sessions(conn)
         conn.close()
@@ -134,6 +137,27 @@ def ensure_schema_compatibility(conn):
             conn.commit()
         except Exception:
             pass
+    # Backward-compatible migration for richer order/customer details on older
+    # databases created before order detail pages and receipt export were added.
+    for table_name, columns in {
+        'orders': [('customer_email', 'TEXT'), ('customer_phone', 'TEXT'), ('postal_code', 'TEXT'), ('delivery_instructions', 'TEXT')],
+        'order_items': [('product_name_snapshot', 'TEXT'), ('product_image_snapshot', 'TEXT'), ('variant_snapshot', 'TEXT'), ('discount', 'REAL'), ('line_total', 'REAL')],
+    }.items():
+        if os.environ.get('DB_ENGINE', 'sqlite').lower() == 'mysql':
+            for column_name, column_type in columns:
+                try:
+                    execute(conn, f'ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}')
+                except Exception:
+                    pass
+        else:
+            existing_columns = {row[1] for row in conn.execute(f'PRAGMA table_info({table_name})')}
+            for column_name, column_type in columns:
+                if column_name not in existing_columns:
+                    try:
+                        conn.execute(f'ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}')
+                        conn.commit()
+                    except Exception:
+                        pass
     if os.environ.get('DB_ENGINE', 'sqlite').lower() == 'mysql':
         execute(conn, 'DROP TABLE IF EXISTS pink_salt_sliders')
         execute(conn, 'DROP TABLE IF EXISTS pink_salt_settings')

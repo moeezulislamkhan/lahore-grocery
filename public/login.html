@@ -50,16 +50,17 @@
 
 <script src="js/api.js?v=3"></script>
 <script>
-function goToStorefront() {
+function goToSignedInHome(user) {
   sessionStorage.setItem('sg_intro_seen', '1');
-  location.href = 'index.html';
+  const adminRoles = ['admin', 'manager', 'staff', 'employee'];
+  location.href = user && adminRoles.includes(user.role) ? 'admin.html' : 'index.html';
 }
 
 // Keep signed-in visitors on the storefront instead of returning them to auth.
 (function redirectIfLoggedIn() {
   const user = API.user();
   if (user && API.token()) {
-    goToStorefront();
+    goToSignedInHome(user);
   }
 })();
 
@@ -83,7 +84,7 @@ async function doLogin() {
     const { token, user } = await API.post('/api/auth/login', { email, password });
     API.setToken(token);
     API.setUser(user);
-    goToStorefront();
+    goToSignedInHome(user);
   } catch (err) {
     errBox.textContent = err.message || 'Invalid email or password.';
     errBox.style.display = 'block';
@@ -101,7 +102,7 @@ async function doRegister() {
     const { token, user } = await API.post('/api/auth/register', { name, email, password });
     API.setToken(token);
     API.setUser(user);
-    goToStorefront();
+    goToSignedInHome(user);
   } catch (err) {
     errBox.textContent = err.message || 'Could not create your account.';
     errBox.style.display = 'block';

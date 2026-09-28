@@ -7,7 +7,7 @@ from app.deal_utils import db_datetime, deal_status, parse_deal_datetime, serial
 from app.sessions import get_session_user, role_allowed
 
 bp = Blueprint('deals', __name__)
-MANAGE_ROLES = ['admin', 'manager']
+MANAGE_ROLES = ['admin', 'manager', 'employee']
 
 
 def require_manager(db, request):
@@ -173,9 +173,12 @@ def delete_campaign(campaign_id):
     db = current_app.get_db()
     if not require_manager(db, request):
         return jsonify(error='Admin access required.'), 403
-    if not query_one(db, 'SELECT id FROM deal_campaigns WHERE id = ?', (campaign_id,)):
+    campaign = query_one(db, 'SELECT id, title FROM deal_campaigns WHERE id = ?', (campaign_id,))
+    if not campaign:
         return jsonify(error='Deal container not found.'), 404
     execute(db, 'DELETE FROM deal_campaigns WHERE id = ?', (campaign_id,))
+    execute(db, 'INSERT INTO admin_notifications (notification_type, entity_id, message) VALUES (?,?,?)',
+            ('deal_container_deleted', campaign_id, campaign['title']))
     if hasattr(db, 'commit'):
         db.commit()
     return jsonify(success=True)

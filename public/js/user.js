@@ -23,6 +23,26 @@ function logout() {
   API.logout().then(() => { location.href = 'login.html'; });
 }
 
+let userToastTimer;
+function showUserToast(message) {
+  const toast = document.getElementById('userToast');
+  toast.textContent = message;
+  toast.classList.add('show');
+  clearTimeout(userToastTimer);
+  userToastTimer = setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+async function cancelOrder(orderId) {
+  if (!window.confirm('Cancel this order?')) return;
+  try {
+    await API.patch(`/api/orders/${orderId}/cancel`, {});
+    showUserToast('Order cancelled.');
+    await loadAccount();
+  } catch (err) {
+    showUserToast(err.message);
+  }
+}
+
 function showUserPage(page) {
   document.querySelectorAll('.admin-page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('#userNav a').forEach(a => a.classList.remove('active'));
@@ -85,18 +105,20 @@ async function loadAccount() {
     document.getElementById('kpiTotalSpent').textContent = fmt(totalSpent);
     document.getElementById('kpiLastOrder').textContent = orders.length ? orders[0].order_code : 'No orders yet';
 
-    const header = `<thead><tr><th>Order</th><th>Date</th><th>Total</th><th>Payment</th><th>Status</th></tr></thead>`;
+    const header = `<thead><tr><th>Order</th><th>Date</th><th>Total</th><th>Payment</th><th>Status</th><th>Action</th></tr></thead>`;
+    const canAttemptCancellation = order => !['delivered', 'returned', 'cancelled'].includes(order.order_status);
     const rowHtml = (o) => `
       <tr>
         <td>${o.order_code}</td>
         <td>${new Date(o.created_at).toLocaleDateString()}</td>
         <td>${fmt(o.total)}</td>
         <td>${o.payment_method}</td>
-        <td><span class="pill ${o.order_status}">${o.order_status.replace('_', ' ')}</span></td>
+        <td><span class="pill ${o.order_status}">${o.order_status.replace(/_/g, ' ')}</span></td>
+        <td class="row-actions">${canAttemptCancellation(o) ? `<button class="del" onclick="cancelOrder(${o.id})">Cancel order</button>` : '—'}</td>
       </tr>`;
-    const rows = orders.map(rowHtml).join('') || '<tr><td colspan="5" class="empty-note">No orders yet — go find something fresh!</td></tr>';
+    const rows = orders.map(rowHtml).join('') || '<tr><td colspan="6" class="empty-note">No orders yet — go find something fresh!</td></tr>';
     document.getElementById('allOrdersTable').innerHTML = header + '<tbody>' + rows + '</tbody>';
-    document.getElementById('recentOrdersTable').innerHTML = header + '<tbody>' + (orders.slice(0, 5).map(rowHtml).join('') || '<tr><td colspan="5" class="empty-note">No orders yet.</td></tr>') + '</tbody>';
+    document.getElementById('recentOrdersTable').innerHTML = header + '<tbody>' + (orders.slice(0, 5).map(rowHtml).join('') || '<tr><td colspan="6" class="empty-note">No orders yet.</td></tr>') + '</tbody>';
   } catch (err) {
     document.getElementById('allOrdersTable').innerHTML = `<tr><td class="empty-note">${err.message}</td></tr>`;
   }

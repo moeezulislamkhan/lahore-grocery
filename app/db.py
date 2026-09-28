@@ -84,6 +84,70 @@ def init_schema(conn):
         conn.commit()
 
 
+def migrate_order_status_schema(conn):
+    if DB_ENGINE == 'mysql':
+        constraints = query_all(conn, """SELECT tc.CONSTRAINT_NAME, cc.CHECK_CLAUSE
+            FROM information_schema.TABLE_CONSTRAINTS tc
+            JOIN information_schema.CHECK_CONSTRAINTS cc
+              ON cc.CONSTRAINT_SCHEMA = tc.CONSTRAINT_SCHEMA
+             AND cc.CONSTRAINT_NAME = tc.CONSTRAINT_NAME
+            WHERE tc.CONSTRAINT_SCHEMA = DATABASE()
+              AND tc.TABLE_NAME = 'orders'
+              AND tc.CONSTRAINT_TYPE = 'CHECK'""")
+        status_constraints = [item for item in constraints if 'order_status' in item['CHECK_CLAUSE'].lower()]
+        if status_constraints and all('returned' in item['CHECK_CLAUSE'].lower() for item in status_constraints):
+            return
+        for item in status_constraints:
+            name = item['CONSTRAINT_NAME'].replace('`', '``')
+            execute(conn, f'ALTER TABLE orders DROP CHECK `{name}`')
+        execute(conn, """ALTER TABLE orders ADD CONSTRAINT chk_orders_order_status
+            CHECK (order_status IN ('processing','confirmed','out_for_delivery','delivered','returned','cancelled'))""")
+        return
+
+    schema = query_one(conn, "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'orders'")
+    if not schema or 'returned' in schema['sql'].lower():
+        return
+
+    conn.commit()
+    conn.execute('PRAGMA foreign_keys = OFF')
+    try:
+        conn.execute('BEGIN')
+        conn.execute("""CREATE TABLE orders_migrated (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_code TEXT UNIQUE NOT NULL,
+            user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            customer_name TEXT NOT NULL,
+            customer_email TEXT,
+            customer_phone TEXT,
+            phone TEXT NOT NULL,
+            address TEXT NOT NULL,
+            city TEXT,
+            postal_code TEXT,
+            delivery_slot TEXT,
+            delivery_instructions TEXT,
+            subtotal REAL NOT NULL,
+            delivery_fee REAL NOT NULL DEFAULT 0,
+            total REAL NOT NULL,
+            payment_method TEXT NOT NULL CHECK(payment_method IN ('jazzcash','bank','cod')),
+            payment_status TEXT NOT NULL DEFAULT 'pending' CHECK(payment_status IN ('pending','paid','failed','cod_pending','refunded')),
+            gateway TEXT,
+            gateway_txn_ref TEXT,
+            order_status TEXT NOT NULL DEFAULT 'processing' CHECK(order_status IN ('processing','confirmed','out_for_delivery','delivered','returned','cancelled')),
+            created_at TEXT DEFAULT (datetime('now'))
+        )""")
+        columns = [row[1] for row in conn.execute('PRAGMA table_info(orders)')]
+        column_list = ', '.join(f'"{column}"' for column in columns)
+        conn.execute(f'INSERT INTO orders_migrated ({column_list}) SELECT {column_list} FROM orders')
+        conn.execute('DROP TABLE orders')
+        conn.execute('ALTER TABLE orders_migrated RENAME TO orders')
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.execute('PRAGMA foreign_keys = ON')
+
+
 # ---------------------------------------------------------------------------
 # Schema — kept as two explicit dialects rather than one abstraction, so the
 # actual SQL running against each database is easy to read and verify.
@@ -142,15 +206,27 @@ SCHEMA_SQLITE = [
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now'))
     )""",
+    """CREATE TABLE IF NOT EXISTS admin_notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        notification_type TEXT NOT NULL,
+        entity_id INTEGER,
+        message TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now')),
+        read_at TEXT
+    )""",
     """CREATE TABLE IF NOT EXISTS orders (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         order_code TEXT UNIQUE NOT NULL,
         user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
         customer_name TEXT NOT NULL,
+        customer_email TEXT,
+        customer_phone TEXT,
         phone TEXT NOT NULL,
         address TEXT NOT NULL,
         city TEXT,
+        postal_code TEXT,
         delivery_slot TEXT,
+        delivery_instructions TEXT,
         subtotal REAL NOT NULL,
         delivery_fee REAL NOT NULL DEFAULT 0,
         total REAL NOT NULL,
@@ -158,7 +234,7 @@ SCHEMA_SQLITE = [
         payment_status TEXT NOT NULL DEFAULT 'pending' CHECK(payment_status IN ('pending','paid','failed','cod_pending','refunded')),
         gateway TEXT,
         gateway_txn_ref TEXT,
-        order_status TEXT NOT NULL DEFAULT 'processing' CHECK(order_status IN ('processing','confirmed','out_for_delivery','delivered','cancelled')),
+        order_status TEXT NOT NULL DEFAULT 'processing' CHECK(order_status IN ('processing','confirmed','out_for_delivery','delivered','returned','cancelled')),
         created_at TEXT DEFAULT (datetime('now'))
     )""",
     """CREATE TABLE IF NOT EXISTS order_items (
@@ -166,8 +242,13 @@ SCHEMA_SQLITE = [
         order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
         product_id INTEGER,
         product_name TEXT NOT NULL,
+        product_name_snapshot TEXT,
+        product_image_snapshot TEXT,
+        variant_snapshot TEXT,
         unit_price REAL NOT NULL,
-        qty INTEGER NOT NULL
+        qty INTEGER NOT NULL,
+        discount REAL DEFAULT 0,
+        line_total REAL DEFAULT 0
     )""",
     """CREATE TABLE IF NOT EXISTS support_messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -274,15 +355,27 @@ SCHEMA_MYSQL = [
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
+    """CREATE TABLE IF NOT EXISTS admin_notifications (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        notification_type VARCHAR(60) NOT NULL,
+        entity_id INT,
+        message VARCHAR(500) NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        read_at DATETIME NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
     """CREATE TABLE IF NOT EXISTS orders (
         id INT PRIMARY KEY AUTO_INCREMENT,
         order_code VARCHAR(40) UNIQUE NOT NULL,
         user_id INT NULL,
         customer_name VARCHAR(255) NOT NULL,
+        customer_email VARCHAR(255),
+        customer_phone VARCHAR(30),
         phone VARCHAR(30) NOT NULL,
         address TEXT NOT NULL,
         city VARCHAR(100),
+        postal_code VARCHAR(30),
         delivery_slot VARCHAR(100),
+        delivery_instructions TEXT,
         subtotal DECIMAL(10,2) NOT NULL,
         delivery_fee DECIMAL(10,2) NOT NULL DEFAULT 0,
         total DECIMAL(10,2) NOT NULL,
@@ -290,7 +383,8 @@ SCHEMA_MYSQL = [
         payment_status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK(payment_status IN ('pending','paid','failed','cod_pending','refunded')),
         gateway VARCHAR(30),
         gateway_txn_ref VARCHAR(60),
-        order_status VARCHAR(30) NOT NULL DEFAULT 'processing' CHECK(order_status IN ('processing','confirmed','out_for_delivery','delivered','cancelled')),
+        order_status VARCHAR(30) NOT NULL DEFAULT 'processing',
+        CONSTRAINT chk_orders_order_status CHECK(order_status IN ('processing','confirmed','out_for_delivery','delivered','returned','cancelled')),
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
@@ -299,8 +393,13 @@ SCHEMA_MYSQL = [
         order_id INT NOT NULL,
         product_id INT,
         product_name VARCHAR(255) NOT NULL,
+        product_name_snapshot VARCHAR(255),
+        product_image_snapshot TEXT,
+        variant_snapshot VARCHAR(255),
         unit_price DECIMAL(10,2) NOT NULL,
         qty INT NOT NULL,
+        discount DECIMAL(10,2) DEFAULT 0,
+        line_total DECIMAL(10,2) DEFAULT 0,
         FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
     """CREATE TABLE IF NOT EXISTS support_messages (

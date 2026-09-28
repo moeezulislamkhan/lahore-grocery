@@ -16,13 +16,13 @@
     <div class="abrand"><img src="assets/trolley.png" alt="Shakarganj"><b>Shakarganj</b></div>
     <nav class="admin-nav" id="adminNav">
       <a href="#" data-page="overview" onclick="showAdminPage('overview');return false;">📊 Overview</a>
-      <a href="#" data-page="products" onclick="showAdminPage('products');return false;">🛒 Products</a>
-      <a href="#" data-page="collections" data-req="admin,manager" onclick="showAdminPage('collections');return false;">🧺 Collections</a>
-      <a href="#" data-page="promo-messages" data-req="admin,manager" onclick="showAdminPage('promo-messages');return false;">📣 Promo Messages</a>
-      <a href="#" data-page="deals" data-req="admin,manager" onclick="showAdminPage('deals');return false;">🏷️ Deal Containers</a>
-      <a href="#" data-page="orders" onclick="showAdminPage('orders');return false;">📦 Orders</a>
+      <a href="#" data-page="products" onclick="showAdminPage('products');return false;">🛒 Products<span class="admin-alert-dot" data-admin-alert="products" aria-hidden="true" hidden></span></a>
+      <a href="#" data-page="collections" data-req="admin,manager,employee" onclick="showAdminPage('collections');return false;">🧺 Collections</a>
+      <a href="#" data-page="promo-messages" data-req="admin,manager,employee" onclick="showAdminPage('promo-messages');return false;">📣 Promo Messages</a>
+      <a href="#" data-page="deals" data-req="admin,manager,employee" onclick="showAdminPage('deals');return false;">🏷️ Deal Containers<span class="admin-alert-dot" data-admin-alert="deals" aria-hidden="true" hidden></span></a>
+      <a href="#" data-page="orders" onclick="showAdminPage('orders');return false;">📦 Orders<span class="admin-alert-dot" data-admin-alert="orders" aria-hidden="true" hidden></span></a>
       <a href="#" data-page="analytics" data-req="admin,manager" onclick="showAdminPage('analytics');return false;">📈 Analytics</a>
-      <a href="#" data-page="support" onclick="showAdminPage('support');return false;">💬 Support Inbox</a>
+      <a href="#" data-page="support" onclick="showAdminPage('support');return false;">💬 Support Inbox<span class="admin-alert-dot" data-admin-alert="support" aria-hidden="true" hidden></span></a>
       <a href="#" data-page="members" data-req="admin" onclick="showAdminPage('members');return false;">👥 Members</a>
       <a href="#" data-page="settings" data-req="admin" onclick="showAdminPage('settings');return false;">⚙️ Settings</a>
     </nav>
@@ -45,6 +45,7 @@
     <div class="mobile-panel-nav">
       <button class="mobile-menu-toggle" id="mobileAdminNavToggle" type="button" aria-label="Open admin navigation" aria-controls="mobileAdminNav" aria-expanded="false">
         <span></span><span></span><span></span>
+        <span class="mobile-alert-indicator" aria-hidden="true" hidden></span>
       </button>
       <nav class="mobile-panel-menu" id="mobileAdminNav" aria-label="Admin navigation" hidden></nav>
     </div>
@@ -155,7 +156,19 @@
 
     <!-- ORDERS -->
     <div class="admin-page" id="page-orders">
-      <div class="admin-topbar"><div><h1>Orders</h1><div class="sub">Track payments and fulfilment status.</div></div></div>
+      <div class="admin-topbar">
+        <div><h1>Orders</h1><div class="sub">Track payments and fulfilment status.</div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn small ghost" id="orderHistoryToggle" type="button" aria-expanded="false" onclick="toggleOrderHistory()">View Order History</button>
+          <button class="btn small" type="button" onclick="downloadOrderHistory()">Download Excel</button>
+        </div>
+      </div>
+      <div class="panel" id="orderHistoryPanel" hidden>
+        <div class="table-toolbar"><strong>Complete Order History</strong><span id="orderHistoryCount" style="font-size:12px;color:var(--ink-soft);"></span></div>
+        <div style="overflow-x:auto;">
+          <table class="admin-table" id="orderHistoryTable"></table>
+        </div>
+      </div>
       <div class="panel"><table class="admin-table" id="ordersTable"></table></div>
     </div>
 
@@ -228,6 +241,24 @@
 
 <div class="toast" id="toast"></div>
 
+<div class="modal-mask order-modal-mask" id="orderDetailModal" aria-hidden="true">
+  <div class="modal-box order-detail-modal" role="dialog" aria-modal="true" aria-labelledby="orderDetailTitle">
+    <button type="button" class="close-x" aria-label="Close order details" onclick="closeOrderDetailModal()">×</button>
+    <div class="order-detail-head">
+      <div>
+        <div class="eyebrow">Order overview</div>
+        <h2 id="orderDetailTitle">Order details</h2>
+      </div>
+      <div class="order-detail-actions">
+        <button class="btn small" type="button" onclick="printCurrentOrderReceipt()">Print Receipt</button>
+        <button class="btn small ghost" type="button" onclick="downloadCurrentOrderReceipt()">Download PDF</button>
+      </div>
+    </div>
+    <div id="orderDetailContent" class="order-detail-content"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="js/api.js?v=3"></script>
 <script src="js/site-settings.js?v=1"></script>
 <script src="js/admin.js?v=3"></script>

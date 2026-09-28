@@ -7,7 +7,7 @@ from app.routes.products import enrich_product
 from app.sessions import get_session_user, role_allowed
 
 bp = Blueprint('collections', __name__, url_prefix='/api')
-MANAGE_ROLES = ['admin', 'manager']
+MANAGE_ROLES = ['admin', 'manager', 'employee']
 
 
 def _admin_user(db):

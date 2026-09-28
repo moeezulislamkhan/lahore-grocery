@@ -112,7 +112,7 @@ def jazzcash_return():
                 order_code = order['order_code']
                 new_status = response_code_to_status(response_code)
                 if new_status == 'paid':
-                    execute(db, "UPDATE orders SET payment_status='paid', order_status='confirmed' WHERE id=?", (order['id'],))
+                  execute(db, "UPDATE orders SET payment_status='paid' WHERE id=?", (order['id'],))
                 elif new_status == 'failed':
                     execute(db, "UPDATE orders SET payment_status='failed' WHERE id=?", (order['id'],))
         if hasattr(db, 'commit'):
@@ -140,7 +140,7 @@ def simulate():
         return jsonify(error='Order not found.'), 404
 
     if outcome == 'succeeded':
-        execute(db, "UPDATE orders SET payment_status='paid', order_status='confirmed' WHERE id=?", (order['id'],))
+      execute(db, "UPDATE orders SET payment_status='paid' WHERE id=?", (order['id'],))
     else:
         execute(db, "UPDATE orders SET payment_status='failed' WHERE id=?", (order['id'],))
     if hasattr(db, 'commit'):

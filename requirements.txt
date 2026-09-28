@@ -1,6 +1,7 @@
 Flask>=3.0
 python-dotenv>=1.0
 requests>=2.31
+openpyxl>=3.1
 
 # Only needed if you set DB_ENGINE=mysql in .env — pure-Python MySQL driver,
 # no system libraries or compiler needed:
