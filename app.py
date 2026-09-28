@@ -16,7 +16,7 @@ if __name__ == '__main__':
     live = bool(os.environ.get('JAZZCASH_MERCHANT_ID') and os.environ.get('JAZZCASH_PASSWORD') and os.environ.get('JAZZCASH_INTEGRITY_SALT'))
     db_engine = os.environ.get('DB_ENGINE', 'sqlite')
     print(f"""
-  ShakarGanj Grocery — Python (Flask) backend
+  Shakarganj Grocery — Python (Flask) backend
   --------------------------------------------
   Database:      {db_engine.upper()}
   JazzCash mode: {'LIVE' if live else 'SANDBOX SIMULATION (no JazzCash credentials set)'}

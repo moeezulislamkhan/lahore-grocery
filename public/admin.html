@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ShakarGanj Admin</title>
+<title>Shakarganj Admin</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css?v=3">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -13,10 +13,12 @@
 <!-- DASHBOARD -->
 <div id="adminDashView" class="admin-shell">
   <aside class="admin-sidebar">
-    <div class="abrand"><img src="assets/logo.jpg" alt="logo"><b>ShakarGanj</b></div>
+    <div class="abrand"><img src="assets/trolley.png" alt="Shakarganj"><b>Shakarganj</b></div>
     <nav class="admin-nav" id="adminNav">
       <a href="#" data-page="overview" onclick="showAdminPage('overview');return false;">📊 Overview</a>
       <a href="#" data-page="products" onclick="showAdminPage('products');return false;">🛒 Products</a>
+      <a href="#" data-page="collections" data-req="admin,manager" onclick="showAdminPage('collections');return false;">🧺 Collections</a>
+      <a href="#" data-page="promo-messages" data-req="admin,manager" onclick="showAdminPage('promo-messages');return false;">📣 Promo Messages</a>
       <a href="#" data-page="deals" data-req="admin,manager" onclick="showAdminPage('deals');return false;">🏷️ Deal Containers</a>
       <a href="#" data-page="orders" onclick="showAdminPage('orders');return false;">📦 Orders</a>
       <a href="#" data-page="analytics" data-req="admin,manager" onclick="showAdminPage('analytics');return false;">📈 Analytics</a>
@@ -40,6 +42,12 @@
   </aside>
 
   <main class="admin-main">
+    <div class="mobile-panel-nav">
+      <button class="mobile-menu-toggle" id="mobileAdminNavToggle" type="button" aria-label="Open admin navigation" aria-controls="mobileAdminNav" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+      <nav class="mobile-panel-menu" id="mobileAdminNav" aria-label="Admin navigation" hidden></nav>
+    </div>
     <button class="btn ghost small" id="adminBackBtn" style="margin-bottom:18px;">← Back</button>
     <!-- OVERVIEW -->
     <div class="admin-page active" id="page-overview">
@@ -83,6 +91,7 @@
         <h3>Add new product</h3>
         <div class="add-prod-form">
           <div class="field"><label>Product name</label><input type="text" id="npName" placeholder="e.g. Basmati Rice 5kg"></div>
+          <div class="field"><label>Measurement Unit (Optional)</label><input type="text" id="npUnit" maxlength="40" placeholder="e.g. kg, dozen, L"></div>
           <div class="field"><label>Category</label>
             <select id="npCat"><option>Fruits &amp; Vegetables</option><option>Dairy &amp; Eggs</option><option>Bakery</option><option>Rice, Atta &amp; Pulses</option><option>Beverages</option><option>Household</option><option>Meat &amp; Poultry</option></select>
           </div>
@@ -101,6 +110,7 @@
         <h3>Edit product</h3>
         <div class="add-prod-form">
           <div class="field"><label>Product name</label><input type="text" id="epName" placeholder="e.g. Basmati Rice 5kg"></div>
+          <div class="field"><label>Measurement Unit (Optional)</label><input type="text" id="epUnit" maxlength="40" placeholder="e.g. kg, dozen, L"></div>
           <div class="field"><label>Category</label>
             <select id="epCat"><option>Fruits &amp; Vegetables</option><option>Dairy &amp; Eggs</option><option>Bakery</option><option>Rice, Atta &amp; Pulses</option><option>Beverages</option><option>Household</option><option>Meat &amp; Poultry</option></select>
           </div>
@@ -115,6 +125,32 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <div class="admin-page" id="page-collections">
+      <div class="admin-topbar"><div><h1>Pink Salt Collection</h1><div class="sub">Set the container title and manage products shown in the homepage hero and Pink Salt page.</div></div></div>
+      <div class="panel">
+        <div class="field"><label for="collectionTitle">Container title</label><input id="collectionTitle" placeholder="Our Pink Salt Collection"></div>
+        <div style="margin-top:14px;"><button class="btn" onclick="saveCollectionTitle()">Save title</button></div>
+      </div>
+      <div class="panel" style="margin-top:16px;">
+        <h3>Create new Pink Salt product</h3>
+        <div class="add-prod-form" style="margin-top:0;">
+          <div class="field"><label for="collectionNewProductName">Product name</label><input id="collectionNewProductName" placeholder="e.g. Himalayan Pink Salt Lamp"></div>
+          <div class="field"><label for="collectionNewProductPrice">Price (Rs.)</label><input id="collectionNewProductPrice" type="number" min="1" step="0.01" placeholder="1200"></div>
+          <div class="field"><label for="collectionNewProductSalePrice">Sale price (optional)</label><input id="collectionNewProductSalePrice" type="number" min="0" step="0.01" placeholder="999"></div>
+          <div class="field"><label for="collectionNewProductTag">Product tag (optional)</label><input id="collectionNewProductTag" maxlength="40" placeholder="Pink Salt"></div>
+          <div class="field"><label for="collectionNewProductStock">Stock quantity</label><input id="collectionNewProductStock" type="number" min="0" value="0"></div>
+          <div class="field full"><label for="collectionNewProductImage">Image URL</label><input id="collectionNewProductImage" type="url" placeholder="https://..."></div>
+          <div class="field full"><button class="btn" onclick="createCollectionProduct()">Create and add to collection</button></div>
+        </div>
+        <table class="admin-table"><thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Action</th></tr></thead><tbody id="collectionProductsTbody"></tbody></table>
+      </div>
+    </div>
+
+    <div class="admin-page" id="page-promo-messages">
+      <div class="admin-topbar"><div><h1>Promotional Messages</h1><div class="sub">Messages rotate in the slim strip below the storefront navigation.</div></div></div>
+      <div class="panel"><div class="add-prod-form" style="margin-top:0;"><div class="field full"><label>New message</label><input id="newPromoMessage" maxlength="500" placeholder="Free delivery on orders above Rs. 2,000"></div><div class="field full"><button class="btn" onclick="addPromoMessage()">Add message</button></div></div><table class="admin-table"><thead><tr><th>Message</th><th>Status</th><th>Actions</th></tr></thead><tbody id="promoMessagesTbody"></tbody></table></div>
     </div>
 
     <!-- ORDERS -->

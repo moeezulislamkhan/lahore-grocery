@@ -86,7 +86,7 @@ def create_order():
         bank_iban = query_one(db, "SELECT value FROM settings WHERE setting_key = ?", ('bank_iban',))
         return jsonify(orderCode=order_code, paymentMethod=payment_method, paymentStatus='pending',
                         bankInstructions={
-                            'accountTitle': store_name['value'] if store_name else 'ShakarGanj Grocery Store',
+                            'accountTitle': store_name['value'] if store_name else 'Shakarganj Grocery Store',
                             'bank': bank_name['value'] if bank_name else 'Meezan Bank',
                             'iban': bank_iban['value'] if bank_iban else 'PK00 MEZN 0000 0000 1234 567',
                         }), 201
@@ -96,7 +96,7 @@ def create_order():
         order_code=order_code,
         amount_pkr=total,
         bill_reference=order_code,
-        description=f'ShakarGanj order {order_code}',
+        description=f'Shakarganj order {order_code}',
         base_url=request.host_url.rstrip('/'),  # auto-detects whatever host/port this request actually came in on
     )
     execute(db, 'UPDATE orders SET gateway = ?, gateway_txn_ref = ? WHERE id = ?', ('jazzcash', checkout['txn_ref_no'], order_id))

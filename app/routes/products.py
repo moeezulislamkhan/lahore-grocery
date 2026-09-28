@@ -91,8 +91,11 @@ def create_product():
         sale_price = parse_sale_price(body, price)
     except ValueError as exc:
         return jsonify(error=str(exc)), 400
-    cur = execute(db, 'INSERT INTO products (name, category, price, sale_price, old_price, stock, image, tag) VALUES (?,?,?,?,?,?,?,?)',
-                  (name, category, price, sale_price or None, body.get('oldPrice'), body.get('stock', 0), body.get('image'), body.get('tag')))
+    unit = str(body.get('unit') or '').strip()
+    if len(unit) > 40:
+        return jsonify(error='Measurement unit must be 40 characters or fewer.'), 400
+    cur = execute(db, 'INSERT INTO products (name, category, price, sale_price, old_price, stock, image, tag, unit) VALUES (?,?,?,?,?,?,?,?,?)',
+                  (name, category, price, sale_price or None, body.get('oldPrice'), body.get('stock', 0), body.get('image'), body.get('tag'), unit or None))
     if hasattr(db, 'commit'):
         db.commit()
     product = query_one(db, 'SELECT * FROM products WHERE id = ?', (cur.lastrowid,))
@@ -112,13 +115,16 @@ def update_product(product_id):
 
     body = request.get_json(silent=True) or {}
     merged = {**existing, **body}
+    unit = str(merged.get('unit') or '').strip()
+    if len(unit) > 40:
+        return jsonify(error='Measurement unit must be 40 characters or fewer.'), 400
     try:
         sale_price = parse_sale_price(body, merged['price']) if ('salePrice' in body or 'sale_price' in body) else existing.get('sale_price')
     except ValueError as exc:
         return jsonify(error=str(exc)), 400
-    execute(db, 'UPDATE products SET name=?, category=?, price=?, sale_price=?, old_price=?, stock=?, image=?, tag=? WHERE id=?',
+    execute(db, 'UPDATE products SET name=?, category=?, price=?, sale_price=?, old_price=?, stock=?, image=?, tag=?, unit=? WHERE id=?',
             (merged['name'], merged['category'], merged['price'], sale_price or None, merged.get('old_price') or merged.get('oldPrice'),
-             merged['stock'], merged['image'], merged['tag'], product_id))
+             merged['stock'], merged['image'], merged['tag'], unit or None, product_id))
     if hasattr(db, 'commit'):
         db.commit()
     product = query_one(db, 'SELECT * FROM products WHERE id = ?', (product_id,))

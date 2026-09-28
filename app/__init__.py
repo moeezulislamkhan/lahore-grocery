@@ -55,6 +55,7 @@ def create_app():
     from app.routes.settings import bp as settings_bp
     from app.routes.employees import bp as employees_bp
     from app.routes.deals import bp as deals_bp
+    from app.routes.collections import bp as collections_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(products_bp)
@@ -65,6 +66,7 @@ def create_app():
     app.register_blueprint(settings_bp)
     app.register_blueprint(employees_bp)
     app.register_blueprint(deals_bp)
+    app.register_blueprint(collections_bp)
 
     # ---- Serve the frontend (public/) as static files ----------------------
     @app.route('/', defaults={'path': 'index.html'})
@@ -122,6 +124,17 @@ def ensure_schema_compatibility(conn):
         except Exception:
             pass
     if os.environ.get('DB_ENGINE', 'sqlite').lower() == 'mysql':
+        try:
+            execute(conn, 'ALTER TABLE products ADD COLUMN unit VARCHAR(40) NULL')
+        except Exception:
+            pass
+    else:
+        try:
+            conn.execute('ALTER TABLE products ADD COLUMN unit TEXT')
+            conn.commit()
+        except Exception:
+            pass
+    if os.environ.get('DB_ENGINE', 'sqlite').lower() == 'mysql':
         execute(conn, 'DROP TABLE IF EXISTS pink_salt_sliders')
         execute(conn, 'DROP TABLE IF EXISTS pink_salt_settings')
         try:
@@ -136,6 +149,19 @@ def ensure_schema_compatibility(conn):
         if 'is_pink_salt' in product_columns:
             conn.execute('ALTER TABLE products DROP COLUMN is_pink_salt')
         conn.execute('DELETE FROM settings WHERE setting_key = ?', ('pink_salt_home_products',))
+        conn.commit()
+    if not query_one(conn, 'SELECT id FROM collections WHERE slug = ?', ('pink-salt',)):
+        execute(conn, 'INSERT INTO collections (name, slug, title, button_text, is_featured) VALUES (?, ?, ?, ?, ?)',
+                ('Pink Salt Collection', 'pink-salt', 'Our Pink Salt Collection', 'Explore Our Pink Salt Collection', 1))
+    if query_one(conn, 'SELECT id FROM collections WHERE is_featured = 1') is None:
+        execute(conn, 'UPDATE collections SET is_featured = 1 WHERE slug = ?', ('pink-salt',))
+    if query_one(conn, 'SELECT setting_key FROM settings WHERE setting_key = ?', ('promo_messages_initialized',)) is None:
+        if query_one(conn, 'SELECT id FROM promo_messages LIMIT 1') is None:
+            execute(conn, 'INSERT INTO promo_messages (message, is_active, display_order) VALUES (?, ?, ?)',
+                    ('Free delivery on orders above Rs. 2,000', 1, 0))
+        execute(conn, 'INSERT INTO settings (setting_key, value) VALUES (?, ?)',
+                ('promo_messages_initialized', '1'))
+    if hasattr(conn, 'commit'):
         conn.commit()
     if os.environ.get('DB_ENGINE', 'sqlite').lower() != 'mysql':
         conn.execute("""CREATE TABLE IF NOT EXISTS deals (
@@ -173,7 +199,7 @@ def seed_data(conn):
         admin_email = os.environ.get('ADMIN_EMAIL', 'shakarganj@gmail.com')
         admin_password = os.environ.get('ADMIN_PASSWORD', '11223344')
         seed_users = [
-            ('ShakarGanj Admin', admin_email, admin_password, 'admin'),
+            ('Shakarganj Admin', admin_email, admin_password, 'admin'),
             ('Sana Tariq', 'manager@shakarganj.pk', 'Manager@123', 'manager'),
             ('Bilal Ahmed', 'staff@shakarganj.pk', 'Staff@123', 'staff'),
             ('Ayesha Malik', 'customer@shakarganj.pk', 'Customer@123', 'user'),
@@ -209,7 +235,7 @@ def seed_data(conn):
         # default, so nothing visibly changes until the admin actually saves
         # different values from Admin Panel → Settings.
         default_settings = {
-            'store_name': 'ShakarGanj Grocery Store',
+            'store_name': 'Shakarganj Grocery Store',
             'support_phone': '+92 300 1234567',
             'support_email': 'orders@shakarganj.pk',
             'whatsapp_number': '',

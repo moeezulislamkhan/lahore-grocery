@@ -1,4 +1,4 @@
-// public/js/admin.js — ShakarGanj admin dashboard logic
+// public/js/admin.js — Shakarganj admin dashboard logic
 
 const ROLE_INFO = {
   admin: { label: 'Administrator', desc: 'Full access to all modules' },
@@ -54,6 +54,7 @@ function enterDashboard(user) {
     const req = a.dataset.req;
     if (req) a.classList.toggle('locked', !req.split(',').includes(user.role));
   });
+  setupMobilePanelNav();
   loadGatewayMode();
   showAdminPage('overview');
   // Each of these manages its own try/catch internally and is independent —
@@ -63,6 +64,8 @@ function enterDashboard(user) {
   loadProducts();
   loadDeals();
   loadCampaigns();
+  loadCollectionsAdmin();
+  loadPromoMessagesAdmin();
   loadOrders();
   loadSupport();
   loadSettings();
@@ -78,6 +81,7 @@ function showAdminPage(page) {
     const allowed = !req || (currentUser && req.split(',').includes(currentUser.role));
     document.querySelectorAll('.admin-page').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('#adminNav a').forEach(a => a.classList.remove('active'));
+    document.querySelectorAll('#mobileAdminNav a').forEach(a => a.classList.toggle('active', a.dataset.page === page));
     if (!allowed) { document.getElementById('page-denied').classList.add('active'); return; }
     document.getElementById('page-' + page).classList.add('active');
     if (link) link.classList.add('active');
@@ -102,6 +106,41 @@ function updateAdminBackButton(page) {
     btn.textContent = '← Back to Overview';
     btn.onclick = () => showAdminPage('overview');
   }
+}
+
+function setupMobilePanelNav() {
+  const source = document.getElementById('adminNav');
+  const menu = document.getElementById('mobileAdminNav');
+  const toggle = document.getElementById('mobileAdminNavToggle');
+  if (!source || !menu || !toggle) return;
+
+  menu.replaceChildren(...Array.from(source.children, link => link.cloneNode(true)));
+  const logoutButton = document.createElement('button');
+  logoutButton.type = 'button';
+  logoutButton.className = 'mobile-panel-logout';
+  logoutButton.textContent = 'Sign out';
+  logoutButton.addEventListener('click', logout);
+  menu.appendChild(logoutButton);
+
+  const closeMenu = () => {
+    menu.hidden = true;
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.setAttribute('aria-label', 'Open admin navigation');
+  };
+  toggle.addEventListener('click', () => {
+    menu.hidden = !menu.hidden;
+    toggle.setAttribute('aria-expanded', String(!menu.hidden));
+    toggle.setAttribute('aria-label', menu.hidden ? 'Open admin navigation' : 'Close admin navigation');
+  });
+  menu.addEventListener('click', event => {
+    if (event.target.closest('a')) closeMenu();
+  });
+  document.addEventListener('click', event => {
+    if (!menu.hidden && !menu.contains(event.target) && !toggle.contains(event.target)) closeMenu();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') closeMenu();
+  });
 }
 
 /* ============ GATEWAY MODE ============ */
@@ -165,11 +204,12 @@ function renderAdminProducts(filter = '') {
   document.getElementById('prodCount').textContent = list.length + ' products';
   document.getElementById('adminProductsTbody').innerHTML = list.map(p => {
     const status = p.stock === 0 ? '<span class="pill out">Out of stock</span>' : p.stock < 15 ? '<span class="pill low">Low stock</span>' : '<span class="pill instock">In stock</span>';
+    const unitSuffix = p.unit ? '/' + escapeHtml(p.unit.trim().replace(/^\/+/, '')) : '';
     return `<tr>
       <td><img src="${p.image}"></td>
       <td>${p.name}</td>
       <td>${p.category}</td>
-      <td>${p.sale_price && p.sale_price < p.price ? `<span class="old">${fmt(p.price)}</span>${fmt(p.sale_price)}` : fmt(p.price)}</td>
+      <td>${p.sale_price && p.sale_price < p.price ? `<span class="old">${fmt(p.price)}</span>${fmt(p.sale_price)}` : fmt(p.price)}${unitSuffix}</td>
       <td>${p.stock}</td>
       <td>${status}</td>
       <td class="row-actions"><button class="edt" onclick="openEditProduct(${p.id})">Edit</button><button class="del" onclick="deleteProduct(${p.id})">Delete</button></td>
@@ -177,6 +217,118 @@ function renderAdminProducts(filter = '') {
   }).join('');
 }
 function filterAdminProducts(v) { renderAdminProducts(v); }
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+}
+
+/* ============ COLLECTIONS ============ */
+let PINK_SALT_COLLECTION = null;
+async function loadCollectionsAdmin() {
+  try {
+    const data = await API.get('/api/admin/collections');
+    PINK_SALT_COLLECTION = (data.collections || []).find(collection => collection.slug === 'pink-salt');
+    if (!PINK_SALT_COLLECTION) {
+      document.getElementById('collectionTitle').value = '';
+      document.getElementById('collectionProductsTbody').innerHTML = '<tr><td colspan="4" class="empty-note">Pink Salt Collection is unavailable.</td></tr>';
+      return;
+    }
+    document.getElementById('collectionTitle').value = PINK_SALT_COLLECTION.title;
+    document.getElementById('collectionProductsTbody').innerHTML = PINK_SALT_COLLECTION.products.map(product => `<tr><td>${product.name}</td><td>${product.category}</td><td>${fmt(product.effective_price || product.price)}</td><td class="row-actions"><button class="del" onclick="removeCollectionProduct(${product.id})">Remove</button></td></tr>`).join('') || '<tr><td colspan="4" class="empty-note">No products added to Pink Salt Collection yet.</td></tr>';
+  } catch (error) { console.error('[admin] Could not load collections:', error); }
+}
+async function saveCollectionTitle() {
+  if (!PINK_SALT_COLLECTION) return;
+  const title = document.getElementById('collectionTitle').value.trim();
+  if (!title) { showToast('Container title is required.'); return; }
+  try {
+    await API.put(`/api/admin/collections/${PINK_SALT_COLLECTION.id}`, { title });
+    showToast('Container title saved.');
+    await loadCollectionsAdmin();
+  } catch (error) { showToast(error.message); }
+}
+async function setCollectionProduct(id, add) {
+  if (!PINK_SALT_COLLECTION) return;
+  const productIds = new Set(PINK_SALT_COLLECTION.product_ids);
+  if (add) productIds.add(id); else productIds.delete(id);
+  try {
+    await API.put(`/api/admin/collections/${PINK_SALT_COLLECTION.id}/products`, { product_ids: [...productIds] });
+    showToast(add ? 'Product added to Pink Salt Collection.' : 'Product removed from Pink Salt Collection.');
+    await loadCollectionsAdmin();
+  }
+  catch (error) { showToast(error.message); }
+}
+async function createCollectionProduct() {
+  if (!PINK_SALT_COLLECTION) { showToast('Pink Salt Collection is unavailable.'); return; }
+  const name = document.getElementById('collectionNewProductName').value.trim();
+  const price = Number(document.getElementById('collectionNewProductPrice').value);
+  const salePriceValue = document.getElementById('collectionNewProductSalePrice').value.trim();
+  const salePrice = salePriceValue ? Number(salePriceValue) : null;
+  const tag = document.getElementById('collectionNewProductTag').value.trim() || 'Pink Salt';
+  const stock = Number.parseInt(document.getElementById('collectionNewProductStock').value, 10) || 0;
+  const image = document.getElementById('collectionNewProductImage').value.trim() || 'https://images.unsplash.com/photo-1610348725531-843dff563e2c?w=300&q=80';
+  if (!name || !Number.isFinite(price) || price <= 0) {
+    showToast('Enter a product name and a valid price.');
+    return;
+  }
+  if (salePrice !== null && (!Number.isFinite(salePrice) || salePrice <= 0 || salePrice >= price)) {
+    showToast('Sale price must be greater than zero and less than the regular price.');
+    return;
+  }
+  try {
+    const { product } = await API.post('/api/products', {
+      name,
+      category: 'Pink Salt',
+      price,
+      salePrice,
+      tag,
+      stock,
+      image,
+    });
+    await setCollectionProduct(product.id, true);
+    ['collectionNewProductName', 'collectionNewProductPrice', 'collectionNewProductSalePrice', 'collectionNewProductTag', 'collectionNewProductImage'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('collectionNewProductStock').value = '0';
+    await loadProducts();
+  } catch (error) { showToast(error.message); }
+}
+async function removeCollectionProduct(productId) { await setCollectionProduct(productId, false); }
+
+/* ============ PROMOTIONAL MESSAGES ============ */
+let ADMIN_PROMO_MESSAGES = [];
+async function loadPromoMessagesAdmin() {
+  try {
+    const { messages } = await API.get('/api/admin/promo-messages');
+    ADMIN_PROMO_MESSAGES = messages || [];
+    document.getElementById('promoMessagesTbody').innerHTML = ADMIN_PROMO_MESSAGES.map(item => `<tr><td>${item.message}</td><td>${item.is_active ? 'Active' : 'Hidden'}</td><td class="row-actions"><button onclick="editPromoMessage(${item.id})">Edit</button><button onclick="togglePromoMessage(${item.id})">${item.is_active ? 'Hide' : 'Show'}</button><button class="del" onclick="deletePromoMessage(${item.id})">Delete</button></td></tr>`).join('') || '<tr><td colspan="3" class="empty-note">No promotional messages yet.</td></tr>';
+  } catch (error) { console.error('[admin] Could not load promotional messages:', error); }
+}
+async function addPromoMessage() {
+  const input = document.getElementById('newPromoMessage');
+  const message = input.value.trim();
+  if (!message) return;
+  try { await API.post('/api/admin/promo-messages', { message }); input.value = ''; await loadPromoMessagesAdmin(); showToast('Promotional message added.'); }
+  catch (error) { showToast(error.message); }
+}
+async function editPromoMessage(id) {
+  const item = ADMIN_PROMO_MESSAGES.find(message => message.id === id);
+  if (!item) return;
+  const message = window.prompt('Edit promotional message', item.message);
+  if (message === null || !message.trim()) return;
+  try { await API.put(`/api/admin/promo-messages/${id}`, { ...item, message: message.trim() }); await loadPromoMessagesAdmin(); showToast('Promotional message updated.'); }
+  catch (error) { showToast(error.message); }
+}
+async function togglePromoMessage(id) {
+  const item = ADMIN_PROMO_MESSAGES.find(message => message.id === id);
+  if (!item) return;
+  try { await API.put(`/api/admin/promo-messages/${id}`, { ...item, is_active: !item.is_active }); await loadPromoMessagesAdmin(); }
+  catch (error) { showToast(error.message); }
+}
+async function deletePromoMessage(id) {
+  if (!window.confirm('Delete this promotional message?')) return;
+  try { await API.delete(`/api/admin/promo-messages/${id}`); await loadPromoMessagesAdmin(); }
+  catch (error) { showToast(error.message); }
+}
 
 /* ============ DEALS ============ */
 let ALL_DEALS = [];
@@ -283,6 +435,7 @@ function closeAddProduct() { document.getElementById('addProductPanel').style.di
 
 async function addProduct() {
   const name = document.getElementById('npName').value.trim();
+  const unit = document.getElementById('npUnit').value.trim();
   const category = document.getElementById('npCat').value;
   const price = parseFloat(document.getElementById('npPrice').value) || 0;
   const salePriceValue = document.getElementById('npSalePrice').value.trim();
@@ -292,10 +445,10 @@ async function addProduct() {
   const image = document.getElementById('npImg').value.trim() || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&q=80';
   if (!name || !price) { showToast('Please enter at least a product name and price.'); return; }
   try {
-    await API.post('/api/products', { name, category, price, salePrice, tag, stock, image });
+    await API.post('/api/products', { name, unit, category, price, salePrice, tag, stock, image });
     showToast('Product added.');
     closeAddProduct();
-    document.getElementById('npName').value = ''; document.getElementById('npPrice').value = ''; document.getElementById('npSalePrice').value = ''; document.getElementById('npTag').value = ''; document.getElementById('npStock').value = ''; document.getElementById('npImg').value = '';
+    document.getElementById('npName').value = ''; document.getElementById('npUnit').value = ''; document.getElementById('npPrice').value = ''; document.getElementById('npSalePrice').value = ''; document.getElementById('npTag').value = ''; document.getElementById('npStock').value = ''; document.getElementById('npImg').value = '';
     loadProducts();
   } catch (err) { showToast(err.message); }
 }
@@ -397,6 +550,7 @@ function openEditProduct(productId) {
   if (!product) return;
   CURRENT_EDIT_PRODUCT_ID = productId;
   document.getElementById('epName').value = product.name;
+  document.getElementById('epUnit').value = product.unit || '';
   document.getElementById('epCat').value = product.category;
   document.getElementById('epPrice').value = product.price;
   document.getElementById('epSalePrice').value = product.sale_price || '';
@@ -413,6 +567,7 @@ function closeEditProduct() {
 async function saveEditProduct() {
   if (!CURRENT_EDIT_PRODUCT_ID) return;
   const name = document.getElementById('epName').value.trim();
+  const unit = document.getElementById('epUnit').value.trim();
   const category = document.getElementById('epCat').value;
   const price = parseFloat(document.getElementById('epPrice').value) || 0;
   const salePriceValue = document.getElementById('epSalePrice').value.trim();
@@ -422,7 +577,7 @@ async function saveEditProduct() {
   const image = document.getElementById('epImg').value.trim() || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&q=80';
   if (!name || !price) { showToast('Please enter at least a product name and price.'); return; }
   try {
-    await API.put(`/api/products/${CURRENT_EDIT_PRODUCT_ID}`, { name, category, price, salePrice, tag, stock, image });
+    await API.put(`/api/products/${CURRENT_EDIT_PRODUCT_ID}`, { name, unit, category, price, salePrice, tag, stock, image });
     showToast('Product updated.');
     closeEditProduct();
     loadProducts();

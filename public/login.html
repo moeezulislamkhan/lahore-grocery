@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sign In — ShakarGanj</title>
+<title>Sign In — Shakarganj</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css?v=3">
 </head>
@@ -11,7 +11,7 @@
 
 <div class="admin-login-wrap">
   <div class="admin-login-card">
-    <div class="abrand"><img src="assets/logo.jpg" alt="logo" style="border-radius:50%;"><b>ShakarGanj</b></div>
+    <div class="abrand"><img src="assets/trolley.png" alt="Shakarganj"><b>Shakarganj</b></div>
 
     <div class="sp-tabs" style="margin-bottom:22px;">
       <button id="tabLoginBtn" class="active" onclick="switchTab('login')">Sign In</button>
@@ -50,21 +50,16 @@
 
 <script src="js/api.js?v=3"></script>
 <script>
-// Where each role lands after a successful sign-in. This is the ONLY branch
-// point in the whole app — there is no separate "admin login" anywhere.
-const ROLE_DESTINATIONS = {
-  admin: 'admin.html',
-  manager: 'admin.html',
-  staff: 'admin.html',
-  employee: 'admin.html',
-  user: 'user-dashboard.html',
-};
+function goToStorefront() {
+  sessionStorage.setItem('sg_intro_seen', '1');
+  location.href = 'index.html';
+}
 
-// If already signed in, skip straight to the right panel.
+// Keep signed-in visitors on the storefront instead of returning them to auth.
 (function redirectIfLoggedIn() {
   const user = API.user();
-  if (user && API.token() && ROLE_DESTINATIONS[user.role]) {
-    location.href = ROLE_DESTINATIONS[user.role];
+  if (user && API.token()) {
+    goToStorefront();
   }
 })();
 
@@ -74,6 +69,9 @@ function switchTab(tab) {
   document.getElementById('loginForm').style.display = tab === 'login' ? 'block' : 'none';
   document.getElementById('registerForm').style.display = tab === 'register' ? 'block' : 'none';
 }
+
+const requestedTab = new URLSearchParams(location.search).get('tab');
+if (requestedTab === 'register') switchTab('register');
 
 async function doLogin() {
   const email = document.getElementById('loginEmail').value.trim();
@@ -85,10 +83,7 @@ async function doLogin() {
     const { token, user } = await API.post('/api/auth/login', { email, password });
     API.setToken(token);
     API.setUser(user);
-    // Backend decided the role — frontend just follows it. This is the
-    // "Admin Email + Password → Backend Authentication → Admin Role →
-    // Admin Panel" (and the equivalent for users) flow, in one place.
-    location.href = ROLE_DESTINATIONS[user.role] || 'index.html';
+    goToStorefront();
   } catch (err) {
     errBox.textContent = err.message || 'Invalid email or password.';
     errBox.style.display = 'block';
@@ -106,7 +101,7 @@ async function doRegister() {
     const { token, user } = await API.post('/api/auth/register', { name, email, password });
     API.setToken(token);
     API.setUser(user);
-    location.href = ROLE_DESTINATIONS[user.role] || 'index.html'; // new accounts are always role 'user'
+    goToStorefront();
   } catch (err) {
     errBox.textContent = err.message || 'Could not create your account.';
     errBox.style.display = 'block';

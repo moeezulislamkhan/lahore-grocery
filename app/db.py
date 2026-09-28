@@ -114,6 +114,7 @@ SCHEMA_SQLITE = [
         stock INTEGER NOT NULL DEFAULT 0,
         image TEXT,
         tag TEXT,
+        unit TEXT,
         created_at TEXT DEFAULT (datetime('now'))
     )""",
     """CREATE TABLE IF NOT EXISTS deals (
@@ -192,6 +193,30 @@ SCHEMA_SQLITE = [
         value TEXT NOT NULL,
         updated_at TEXT DEFAULT (datetime('now'))
     )""",
+    """CREATE TABLE IF NOT EXISTS collections (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        slug TEXT NOT NULL UNIQUE,
+        title TEXT NOT NULL,
+        button_text TEXT NOT NULL DEFAULT 'Explore Collection',
+        is_featured INTEGER NOT NULL DEFAULT 0 CHECK(is_featured IN (0,1)),
+        rotation_interval_minutes INTEGER NOT NULL DEFAULT 30,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+    )""",
+    """CREATE TABLE IF NOT EXISTS collection_products (
+        collection_id INTEGER NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+        product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+        display_order INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (collection_id, product_id)
+    )""",
+    """CREATE TABLE IF NOT EXISTS promo_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        message TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0,1)),
+        display_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now'))
+    )""",
 ]
 
 SCHEMA_MYSQL = [
@@ -220,6 +245,7 @@ SCHEMA_MYSQL = [
         stock INT NOT NULL DEFAULT 0,
         image TEXT,
         tag VARCHAR(40),
+        unit VARCHAR(40),
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
     """CREATE TABLE IF NOT EXISTS deals (
@@ -301,5 +327,31 @@ SCHEMA_MYSQL = [
         setting_key VARCHAR(255) PRIMARY KEY,
         value LONGTEXT NOT NULL,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
+    """CREATE TABLE IF NOT EXISTS collections (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        name VARCHAR(120) NOT NULL,
+        slug VARCHAR(140) NOT NULL UNIQUE,
+        title VARCHAR(180) NOT NULL,
+        button_text VARCHAR(120) NOT NULL DEFAULT 'Explore Collection',
+        is_featured TINYINT(1) NOT NULL DEFAULT 0,
+        rotation_interval_minutes INT NOT NULL DEFAULT 30,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
+    """CREATE TABLE IF NOT EXISTS collection_products (
+        collection_id INT NOT NULL,
+        product_id INT NOT NULL,
+        display_order INT NOT NULL DEFAULT 0,
+        PRIMARY KEY (collection_id, product_id),
+        FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE CASCADE,
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
+    """CREATE TABLE IF NOT EXISTS promo_messages (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        message VARCHAR(500) NOT NULL,
+        is_active TINYINT(1) NOT NULL DEFAULT 1,
+        display_order INT NOT NULL DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
 ]

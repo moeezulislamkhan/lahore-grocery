@@ -1,4 +1,4 @@
-// public/js/app.js — ShakarGanj storefront logic
+// public/js/app.js — Shakarganj storefront logic
 
 /* ============ SPLASH SEQUENCE ============ */
 // The dot's expansion origin is calculated from the live position of the "@"
@@ -9,6 +9,7 @@ const splashDot = document.getElementById('splashDot');
 const atSymbol = document.getElementById('atSymbol');
 let splashDone = false;
 let splashExpanded = false;
+let splashStarted = false;
 
 function positionDotOnAt() {
   if (!atSymbol || !splashDot || splashExpanded) return;
@@ -34,6 +35,8 @@ function positionDotOnAt() {
 }
 
 function runSplash() {
+  if (splashStarted || splashDone || !splash || !splashDot) return;
+  splashStarted = true;
   positionDotOnAt();
   window.addEventListener('resize', positionDotOnAt);
 
@@ -42,19 +45,29 @@ function runSplash() {
     if (splashDone) return;
     positionDotOnAt(); // final recompute right before the trigger, in case of late layout shifts
     splashExpanded = true;
-    splash.classList.add('expanding');
-
-    // Stage 2 — dot expands outward from the "@" center (2.3s, matches CSS transition)
-    // Total splash duration: 1.2s + 2.3s = 3.5s.
-    splashDot.addEventListener('transitionend', function onDone(e) {
-      if (e.propertyName !== 'transform' || splashDone) return;
-      splashDot.removeEventListener('transitionend', onDone);
-      // Stage 3 — the instant the circle fully covers the screen, swap in the
-      // solid fill (same color) and reveal the next screen on top of it.
+    let transitionFinished = false;
+    let transitionFallback;
+    const finishExpansion = () => {
+      if (transitionFinished || splashDone) return;
+      transitionFinished = true;
+      clearTimeout(transitionFallback);
+      splashDot.removeEventListener('transitionend', onTransitionEnd);
       splash.classList.add('filled');
       requestAnimationFrame(() => splash.classList.add('show-logo'));
-    });
+    };
+    const onTransitionEnd = event => {
+      if (event.target === splashDot && event.propertyName === 'transform') finishExpansion();
+    };
+    splashDot.addEventListener('transitionend', onTransitionEnd);
+    splash.classList.add('expanding');
+
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    transitionFallback = setTimeout(finishExpansion, reducedMotion ? 100 : 2600);
   }, 1200);
+}
+
+function startSplash() {
+  if (!splashDone) runSplash();
 }
 
 // Wait for web fonts to finish loading before measuring/positioning the dot —
@@ -72,19 +85,11 @@ if (sessionStorage.getItem(INTRO_SEEN_KEY)) {
   splash.style.display = 'none';
   document.getElementById('app').classList.add('ready');
 } else if (document.fonts && document.fonts.ready) {
-  document.fonts.ready.then(runSplash).catch(runSplash);
+  document.fonts.ready.then(startSplash).catch(startSplash);
+  setTimeout(startSplash, 1500);
 } else {
-  runSplash();
+  startSplash();
 }
-function enterSite() {
-  if (splashDone) return;
-  splashDone = true;
-  sessionStorage.setItem(INTRO_SEEN_KEY, '1');
-  splash.style.transition = 'opacity .5s ease';
-  splash.style.opacity = '0';
-  setTimeout(() => { splash.style.display = 'none'; document.getElementById('app').classList.add('ready'); }, 500);
-}
-
 /* ============ PRODUCT CATALOG (from API) ============ */
 const CATEGORY_ICONS = {
   'Fruits & Vegetables': '🥕', 'Dairy & Eggs': '🥛', 'Bakery': '🍞',
@@ -162,18 +167,22 @@ function renderCategories() {
 }
 
 function productPriceHtml(p) {
+  const unitSuffix = p.unit ? '/' + escapeHtml(p.unit.trim().replace(/^\/+/, '')) : '';
   if (p.deal || p.has_sale_price) {
-    return '<span class="old">' + fmt(p.price) + '</span>' + fmt(p.effective_price);
+    return '<span class="old">' + fmt(p.price) + '</span>' + fmt(p.effective_price) + unitSuffix;
   }
   const oldPrice = p.old_price ? '<span class="old">' + fmt(p.old_price) + '</span>' : '';
-  return oldPrice + fmt(p.price);
+  return oldPrice + fmt(p.price) + unitSuffix;
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 }
 
 function productCardHtml(p) {
-  const saleTag = p.deal ? '<div class="tag sale">DEAL</div>' : (p.has_sale_price ? '<div class="tag sale">SALE</div>' : (p.tag ? '<div class="tag' + (p.tag === 'Sale' ? ' sale' : '') + '">' + p.tag + '</div>' : ''));
-  const tagHtml = p.tag ? '<div class="product-eyebrow">' + p.tag + '</div>' : '';
+  const saleTag = p.deal ? '<div class="tag sale">DEAL</div>' : (p.tag ? '<div class="tag' + (p.tag === 'Sale' ? ' sale' : '') + '">' + p.tag + '</div>' : (p.has_sale_price ? '<div class="tag sale">SALE</div>' : ''));
   const disabled = p.stock === 0 ? 'disabled style="opacity:.35;cursor:not-allowed;"' : '';
-  return '<div class="p-card">' + saleTag + '<div class="img-wrap"><img src="' + p.image + '" alt="' + p.name + '"></div><div class="body"><div class="cat-lbl">' + p.category + '</div>' + tagHtml + '<div class="p-title">' + p.name + '</div><div class="row"><div class="price">' + productPriceHtml(p) + '</div><button class="add-btn" onclick="addToCart(' + p.id + ')" ' + disabled + '>+</button></div></div></div>';
+  return '<div class="p-card">' + saleTag + '<div class="img-wrap"><img src="' + p.image + '" alt="' + p.name + '"></div><div class="body"><div class="cat-lbl">' + p.category + '</div><div class="p-title">' + p.name + '</div><div class="row"><div class="price">' + productPriceHtml(p) + '</div><button class="add-btn" onclick="addToCart(' + p.id + ')" ' + disabled + '>+</button></div></div></div>';
 }
 
 function renderProducts(showAll = false) {
@@ -373,26 +382,22 @@ async function placeOrder() {
 }
 
 /* ============ ACCOUNT LINK (header) ============ */
-// Reflects whatever the backend told us at login — no separate "Admin"
-// button anywhere; this single link goes wherever this signed-in account
-// actually belongs, or to the unified sign-in page for a guest.
+// Route the Settings shortcut to the signed-in user's panel.
 function updateAccountLink() {
   const link = document.getElementById('accountLink');
   const label = document.getElementById('accountLabel');
   if (!link || !label) return;
   const user = API.user();
   if (user && API.token()) {
-    if (['admin', 'manager', 'staff'].includes(user.role)) {
+    if (['admin', 'manager', 'staff', 'employee'].includes(user.role)) {
       link.href = 'admin.html';
-      label.textContent = 'Admin Panel';
     } else {
       link.href = 'user-dashboard.html';
-      label.textContent = user.name.split(' ')[0];
     }
   } else {
     link.href = 'login.html';
-    label.textContent = 'Sign In';
   }
+  label.textContent = 'Settings';
 }
 
 /* ============ FOOTER SETTINGS (live from Admin → Settings) ============ */
@@ -411,7 +416,7 @@ async function loadFooterSettings() {
     }
     if (nameEl && settings.store_name) nameEl.textContent = settings.store_name;
     if (copyEl && settings.store_name) copyEl.textContent = settings.store_name;
-    if (bankEl) bankEl.textContent = `Account title: ${settings.store_name || 'ShakarGanj Grocery Store'}. Bank: ${settings.bank_name || 'Meezan Bank'}. IBAN: ${settings.bank_iban || 'PK00 MEZN 0000 0000 1234 567'}.`;
+    if (bankEl) bankEl.textContent = `Account title: ${settings.store_name || 'Shakarganj Grocery Store'}. Bank: ${settings.bank_name || 'Meezan Bank'}. IBAN: ${settings.bank_iban || 'PK00 MEZN 0000 0000 1234 567'}.`;
   } catch (err) {
     // Footer already shows sensible hard-coded defaults in the HTML — if this
     // call fails for any reason, the page still looks correct, just not live.

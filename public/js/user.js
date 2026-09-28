@@ -26,9 +26,48 @@ function logout() {
 function showUserPage(page) {
   document.querySelectorAll('.admin-page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('#userNav a').forEach(a => a.classList.remove('active'));
+  document.querySelectorAll('#mobileUserNav a').forEach(a => a.classList.remove('active'));
   document.getElementById('page-' + page).classList.add('active');
   const link = document.querySelector(`#userNav a[data-page="${page}"]`);
   if (link) link.classList.add('active');
+  const mobileLink = document.querySelector(`#mobileUserNav a[data-page="${page}"]`);
+  if (mobileLink) mobileLink.classList.add('active');
+}
+
+function setupMobilePanelNav() {
+  const source = document.getElementById('userNav');
+  const menu = document.getElementById('mobileUserNav');
+  const toggle = document.getElementById('mobileUserNavToggle');
+  if (!source || !menu || !toggle) return;
+
+  menu.replaceChildren(...Array.from(source.children, link => link.cloneNode(true)));
+  const logoutButton = document.createElement('button');
+  logoutButton.type = 'button';
+  logoutButton.className = 'mobile-panel-logout';
+  logoutButton.textContent = 'Sign out';
+  logoutButton.addEventListener('click', logout);
+  menu.appendChild(logoutButton);
+  menu.querySelector('[data-page="overview"]')?.classList.add('active');
+
+  const closeMenu = () => {
+    menu.hidden = true;
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.setAttribute('aria-label', 'Open account navigation');
+  };
+  toggle.addEventListener('click', () => {
+    menu.hidden = !menu.hidden;
+    toggle.setAttribute('aria-expanded', String(!menu.hidden));
+    toggle.setAttribute('aria-label', menu.hidden ? 'Open account navigation' : 'Close account navigation');
+  });
+  menu.addEventListener('click', event => {
+    if (event.target.closest('a')) closeMenu();
+  });
+  document.addEventListener('click', event => {
+    if (!menu.hidden && !menu.contains(event.target) && !toggle.contains(event.target)) closeMenu();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') closeMenu();
+  });
 }
 
 async function loadAccount() {
@@ -63,4 +102,5 @@ async function loadAccount() {
   }
 }
 
+setupMobilePanelNav();
 loadAccount();

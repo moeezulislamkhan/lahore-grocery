@@ -8,14 +8,22 @@ const CATEGORY_ICONS = {
   'Rice, Atta & Pulses': '🍚', 'Beverages': '🧃', 'Household': '🧴', 'Meat & Poultry': '🍗',
 };
 function fmt(n) { return 'Rs. ' + Math.round(n).toLocaleString(); }
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+}
 
 const params = new URLSearchParams(location.search);
 const currentCategory = params.get('name') || 'All';
+const currentCollectionSlug = params.get('collection');
 
 let PRODUCTS = []; // only the products for currentCategory — used by cartLines() etc.
 let ALL_CATEGORY_NAMES = [];
 
 async function loadCategoryPage() {
+  if (currentCollectionSlug) {
+    const pickerSection = document.getElementById('categoryPickerSection');
+    if (pickerSection) pickerSection.hidden = true;
+  }
   document.getElementById('categoryTitle').textContent = currentCategory === 'All' ? 'All Products' : currentCategory;
   document.getElementById('categoryBreadcrumb').innerHTML = `<a href="index.html" style="color:inherit;">Shop</a> &rsaquo; ${currentCategory === 'All' ? 'All Products' : currentCategory}`;
 
@@ -34,11 +42,24 @@ async function loadCategoryPage() {
   }
 
   try {
-    const url = currentCategory === 'All' ? '/api/products' : `/api/products?category=${encodeURIComponent(currentCategory)}`;
-    const { products } = await API.get(url);
-    PRODUCTS = currentCategory === 'All'
-      ? products
-      : products.filter(product => product.category === currentCategory);
+    if (currentCollectionSlug) {
+      const { collection } = await API.get(`/api/collections/${encodeURIComponent(currentCollectionSlug)}`);
+      PRODUCTS = collection.products || [];
+      document.title = `${collection.name} — Shakarganj Grocery`;
+      document.getElementById('categoryTitle').textContent = collection.title;
+      const breadcrumb = document.getElementById('categoryBreadcrumb');
+      const shopLink = document.createElement('a');
+      shopLink.href = 'index.html';
+      shopLink.style.color = 'inherit';
+      shopLink.textContent = 'Shop';
+      breadcrumb.replaceChildren(shopLink, document.createTextNode(` › ${collection.name}`));
+    } else {
+      const url = currentCategory === 'All' ? '/api/products' : `/api/products?category=${encodeURIComponent(currentCategory)}`;
+      const { products } = await API.get(url);
+      PRODUCTS = currentCategory === 'All'
+        ? products
+        : products.filter(product => product.category === currentCategory);
+    }
     document.getElementById('categoryCount').textContent = `${PRODUCTS.length} product${PRODUCTS.length === 1 ? '' : 's'}`;
     renderCategoryProducts();
     renderCart(); // cart may reference products not in this category — cartLines() below handles that
@@ -79,14 +100,13 @@ function renderCategoryProducts() {
   }
   grid.innerHTML = PRODUCTS.map(p => `
     <div class="p-card">
-      ${p.deal ? '<div class="tag sale">DEAL</div>' : (p.has_sale_price ? '<div class="tag sale">SALE</div>' : (p.tag ? `<div class="tag ${p.tag === 'Sale' ? 'sale' : ''}">${p.tag}</div>` : ''))}
+      ${p.deal ? '<div class="tag sale">DEAL</div>' : (p.tag ? `<div class="tag ${p.tag === 'Sale' ? 'sale' : ''}">${p.tag}</div>` : (p.has_sale_price ? '<div class="tag sale">SALE</div>' : ''))}
       <div class="img-wrap"><img src="${p.image}" alt="${p.name}"></div>
       <div class="body">
         <div class="cat-lbl">${p.category}</div>
-        ${p.tag ? `<div class="product-eyebrow">${p.tag}</div>` : ''}
         <div class="p-title">${p.name}</div>
         <div class="row">
-          <div class="price">${p.deal || p.has_sale_price ? `<span class="old">${fmt(p.price)}</span>${fmt(p.effective_price)}` : `${p.old_price ? `<span class="old">${fmt(p.old_price)}</span>` : ''}${fmt(p.price)}`}</div>
+          <div class="price">${p.deal || p.has_sale_price ? `<span class="old">${fmt(p.price)}</span>${fmt(p.effective_price)}` : `${p.old_price ? `<span class="old">${fmt(p.old_price)}</span>` : ''}${fmt(p.price)}`}${p.unit ? `/${escapeHtml(p.unit.trim().replace(/^\/+/, ''))}` : ''}</div>
           <button class="add-btn" onclick="addToCart(${p.id})" ${p.stock === 0 ? 'disabled style="opacity:.35;cursor:not-allowed;"' : ''}>+</button>
         </div>
       </div>
@@ -293,17 +313,15 @@ function updateAccountLink() {
   if (!link || !label) return;
   const user = API.user();
   if (user && API.token()) {
-    if (['admin', 'manager', 'staff'].includes(user.role)) {
+    if (['admin', 'manager', 'staff', 'employee'].includes(user.role)) {
       link.href = 'admin.html';
-      label.textContent = 'Admin Panel';
     } else {
       link.href = 'user-dashboard.html';
-      label.textContent = user.name.split(' ')[0];
     }
   } else {
     link.href = 'login.html';
-    label.textContent = 'Sign In';
   }
+  label.textContent = 'Settings';
 }
 
 /* ============ FOOTER SETTINGS (live from Admin → Settings) ============ */
@@ -322,7 +340,7 @@ async function loadFooterSettings() {
     }
     if (nameEl && settings.store_name) nameEl.textContent = settings.store_name;
     if (copyEl && settings.store_name) copyEl.textContent = settings.store_name;
-    if (bankEl) bankEl.textContent = `Account title: ${settings.store_name || 'ShakarGanj Grocery Store'}. Bank: ${settings.bank_name || 'Meezan Bank'}. IBAN: ${settings.bank_iban || 'PK00 MEZN 0000 0000 1234 567'}.`;
+    if (bankEl) bankEl.textContent = `Account title: ${settings.store_name || 'Shakarganj Grocery Store'}. Bank: ${settings.bank_name || 'Meezan Bank'}. IBAN: ${settings.bank_iban || 'PK00 MEZN 0000 0000 1234 567'}.`;
   } catch (err) { /* footer already shows sensible defaults from the HTML */ }
 }
 

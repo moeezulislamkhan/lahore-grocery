@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>My Account — ShakarGanj</title>
+<title>My Account — Shakarganj</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css?v=3">
 </head>
@@ -11,7 +11,7 @@
 
 <div class="admin-shell">
   <aside class="admin-sidebar">
-    <div class="abrand"><img src="assets/logo.jpg" alt="logo"><b>ShakarGanj</b></div>
+    <div class="abrand"><img src="assets/trolley.png" alt="Shakarganj"><b>Shakarganj</b></div>
     <nav class="admin-nav" id="userNav">
       <a href="#" data-page="overview" onclick="showUserPage('overview');return false;">🏠 Overview</a>
       <a href="#" data-page="orders" onclick="showUserPage('orders');return false;">📦 My Orders</a>
@@ -26,6 +26,12 @@
   </aside>
 
   <main class="admin-main">
+    <div class="mobile-panel-nav">
+      <button class="mobile-menu-toggle" id="mobileUserNavToggle" type="button" aria-label="Open account navigation" aria-controls="mobileUserNav" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+      <nav class="mobile-panel-menu" id="mobileUserNav" aria-label="Account navigation" hidden></nav>
+    </div>
     <!-- OVERVIEW -->
     <div class="admin-page active" id="page-overview">
       <div class="admin-topbar">
@@ -44,7 +50,7 @@
 
     <!-- ORDERS -->
     <div class="admin-page" id="page-orders">
-      <div class="admin-topbar"><div><h1>My Orders</h1><div class="sub">Everything you've ordered from ShakarGanj.</div></div></div>
+      <div class="admin-topbar"><div><h1>My Orders</h1><div class="sub">Everything you've ordered from Shakarganj.</div></div></div>
       <div class="panel"><table class="admin-table" id="allOrdersTable"></table></div>
     </div>
 

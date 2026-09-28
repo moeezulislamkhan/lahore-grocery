@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Shop by Category — ShakarGanj Grocery</title>
+<title>Shop by Category — Shakarganj Grocery</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,900&family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css?v=5">
@@ -15,17 +15,17 @@
   <header class="site-header">
     <div class="header-inner">
       <a class="brand" href="index.html" style="cursor:pointer;">
-        <div class="mark"><img src="assets/logo.jpg" alt="ShakarGanj"></div>
-        <div class="name">ShakarGanj<span>GROCERY STORE</span></div>
+        <div class="mark"><img src="assets/trolley.png" alt="Shakarganj"></div>
+        <div class="name">Shakarganj<span>GROCERY STORE</span></div>
       </a>
       <div class="searchbar">
         <svg width="16" height="16" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input type="text" id="categorySearchInput" placeholder="Search within this category...">
       </div>
       <div class="header-actions">
-        <a class="icon-btn" href="login.html" id="accountLink">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
-          <span id="accountLabel">Sign In</span>
+        <a class="icon-btn" href="login.html" id="accountLink" aria-label="Settings">
+          <span class="settings-symbol" aria-hidden="true">⚙</span>
+          <span id="accountLabel">Settings</span>
         </a>
         <button class="icon-btn" onclick="toggleCart(true)">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg>
@@ -48,7 +48,7 @@
   </section>
 
   <!-- Category "containers" row — every category as its own selectable card, matching the homepage's Shop-by-Category style, so switching categories never means going back to Home first. -->
-  <section class="section" style="padding-top:22px; padding-bottom:0;">
+  <section class="section" id="categoryPickerSection" style="padding-top:22px; padding-bottom:0;">
     <div class="cat-grid" id="categoryPicker"><p class="empty-note">Loading categories…</p></div>
   </section>
 
@@ -59,7 +59,7 @@
   <footer class="site-footer">
     <div class="footer-inner">
       <div>
-        <div id="footerStoreName" style="color:#fff; font-family:'Fraunces',serif; font-weight:700; font-size:19px;">ShakarGanj</div>
+        <div id="footerStoreName" style="color:#fff; font-family:'Fraunces',serif; font-weight:700; font-size:19px;">Shakarganj</div>
         <p style="font-size:12.5px; margin-top:10px; line-height:1.7; max-width:260px;">Your trusted neighbourhood grocery store, now online. Fresh produce and daily essentials delivered across the city.</p>
         <div class="pay-icons">
           <span>JazzCash</span><span>Bank Transfer</span><span>Cash on Delivery</span>
@@ -80,7 +80,7 @@
         <ul><li id="footerPhone" data-setting="phone">+92 300 1234567</li><li><a data-setting="email" href="mailto:orders@shakarganj.pk">orders@shakarganj.pk</a></li><li>Lahore, Pakistan</li></ul>
       </div>
     </div>
-    <div class="footer-bottom">© 2026 <span id="footerCopyrightName">ShakarGanj Grocery Store</span>. All rights reserved.</div>
+    <div class="footer-bottom">© 2026 <span id="footerCopyrightName">Shakarganj Grocery Store</span>. All rights reserved.</div>
   </footer>
 </div>
 
@@ -127,7 +127,7 @@
             <div class="pi" style="background:#620014;">BT</div>
             <div><div class="pt">Bank Transfer</div><div class="ps">Direct bank deposit / IBFT</div></div>
           </div>
-          <div class="pay-detail" id="checkoutBankDetails">Account title: ShakarGanj Grocery Store. Bank: Meezan Bank. IBAN: PK00 MEZN 0000 0000 1234 567.</div>
+          <div class="pay-detail" id="checkoutBankDetails">Account title: Shakarganj Grocery Store. Bank: Meezan Bank. IBAN: PK00 MEZN 0000 0000 1234 567.</div>
 
           <div class="pay-opt" data-pay="cod" onclick="selectPay('cod')">
             <div class="pi" style="background:#3B3B3B;">₨</div>

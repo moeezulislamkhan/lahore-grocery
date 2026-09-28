@@ -82,7 +82,7 @@ def send_submission_email(form_id, name, email, topic, message):
     if not host or not recipient:
         return False
     mail = EmailMessage()
-    mail['Subject'] = f'ShakarGanj support submission {form_id}'
+    mail['Subject'] = f'Shakarganj support submission {form_id}'
     mail['From'] = os.environ.get('MAIL_FROM', os.environ.get('SMTP_USERNAME', recipient))
     mail['To'] = recipient
     mail.set_content(f'Form ID: {form_id}\nName: {name}\nEmail: {email}\nTopic: {topic or "General"}\n\nMessage:\n{message}')

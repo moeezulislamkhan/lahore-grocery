@@ -1,4 +1,4 @@
-# ShakarGanj Grocery — Python (Flask) Full-Stack Project
+# Shakarganj Grocery — Python (Flask) Full-Stack Project
 
 A complete grocery e-commerce site with a **Python (Flask) backend**, real
 JazzCash payment integration, a SQL database (SQLite by default, MySQL-ready),

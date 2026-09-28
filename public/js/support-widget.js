@@ -131,7 +131,7 @@ function initSupportWidget() {
           body: JSON.stringify({
             name, email, topic: topic || 'General', message,
             formId: res.formId,
-            _subject: `ShakarGanj Support: ${topic || 'General'} — ${name}`,
+            _subject: `Shakarganj Support: ${topic || 'General'} — ${name}`,
           }),
         }).catch(() => { /* best-effort — DB save above already succeeded */ });
       }

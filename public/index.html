@@ -20,8 +20,8 @@
       <div class="trolley-badge"><img src="assets/trolley.png" alt="Shakarganj grocery trolley"></div>
       <div class="tagline">Grocery at your doorstep<span class="sub">Fresh &middot; Fast &middot; Trusted since day one</span></div>
       <div class="splash-actions">
-        <button class="btn" onclick="enterSite()">Get Started</button>
-        <button class="btn line" onclick="enterSite()">I already have an account</button>
+        <button class="btn" onclick="location.href='login.html?tab=register'">Get Started</button>
+        <button class="btn line" onclick="location.href='login.html?tab=login'">I already have an account</button>
       </div>
     </div>
   </div>
@@ -29,8 +29,8 @@
 
 <!-- ================= STOREFRONT ================= -->
 <div id="app">
-  <div class="topbar">Free delivery on orders above Rs. 2,000 &nbsp;•&nbsp; Pay via JazzCash, Bank Transfer or Cash on Delivery &nbsp;•&nbsp; <span data-setting="phone">+92 300 1234567</span></div>
-  <header class="site-header">
+  <div class="promo-ticker" aria-label="Store promotions"><div class="promo-ticker-track" id="promoTickerTrack"><span>Free delivery on orders above Rs. 2,000</span><span aria-hidden="true">Free delivery on orders above Rs. 2,000</span></div></div>
+  <header class="site-header has-sticky-promo">
     <div class="header-inner">
       <div class="brand">
         <div class="mark"><img src="assets/trolley.png" alt="Shakarganj"></div>
@@ -41,9 +41,9 @@
         <input type="text" id="productSearchInput" placeholder="Search for atta, milk, rice, cooking oil...">
       </div>
       <div class="header-actions">
-        <a class="icon-btn" href="login.html" id="accountLink">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
-          <span id="accountLabel">Sign In</span>
+        <a class="icon-btn" href="login.html" id="accountLink" aria-label="Settings">
+          <span class="settings-symbol" aria-hidden="true">⚙</span>
+          <span id="accountLabel">Settings</span>
         </a>
         <button class="icon-btn" onclick="toggleCart(true)">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg>
@@ -66,13 +66,14 @@
       <p>Farm-fresh produce, pantry staples and household essentials — hand-picked daily and delivered across Lahore.</p>
       <div class="hero-actions">
         <button class="btn" onclick="document.getElementById('shopGrid').scrollIntoView({behavior:'smooth'})">Shop Now</button>
-        <button class="btn ghost" onclick="document.querySelector('.cat-grid').scrollIntoView({behavior:'smooth'})">View Categories</button>
       </div>
     </div>
-    <div class="hero-visual">
-      <div class="card tall"><img src="https://images.unsplash.com/photo-1610348725531-843dff563e2c?w=400&q=80" alt="Vegetables"><div class="p-name">Fresh Vegetable Box</div><div class="p-price">Rs. 850</div></div>
-      <div class="card"><img src="https://images.unsplash.com/photo-1550583724-b2692b85b150?w=300&q=80" alt="Bread"><div class="p-name">Bakery Bread</div><div class="p-price">Rs. 180</div></div>
-      <div class="card"><img src="https://images.unsplash.com/photo-1563636619-e9143da7973b?w=300&q=80" alt="Milk"><div class="p-name">Fresh Milk 1L</div><div class="p-price">Rs. 260</div></div>
+    <div class="hero-visual collection-hero" id="featuredCollectionHero">
+      <h2 class="collection-hero-title" id="featuredCollectionTitle">Featured Products</h2>
+      <div class="card tall collection-product-card"><img src="https://images.unsplash.com/photo-1610348725531-843dff563e2c?w=400&q=80" alt="Vegetables"><div class="p-name">Fresh Vegetable Box</div><div class="p-price">Rs. 850</div></div>
+      <div class="card collection-product-card"><img src="https://images.unsplash.com/photo-1550583724-b2692b85b150?w=300&q=80" alt="Bread"><div class="p-name">Bakery Bread</div><div class="p-price">Rs. 180</div></div>
+      <div class="card collection-product-card"><img src="https://images.unsplash.com/photo-1563636619-e9143da7973b?w=300&q=80" alt="Milk"><div class="p-name">Fresh Milk 1L</div><div class="p-price">Rs. 260</div></div>
+      <a class="btn collection-hero-button" id="featuredCollectionButton" href="collection.html?slug=pink-salt">Explore Collection</a>
     </div>
   </section>
 
@@ -205,6 +206,7 @@
 <script src="js/api.js?v=3"></script>
 <script src="js/site-settings.js?v=2"></script>
 <script src="js/support-widget.js?v=3"></script>
+<script src="js/collections.js?v=1"></script>
 <script src="js/app.js?v=4"></script>
 </body>
 </html>
