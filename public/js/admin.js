@@ -9,10 +9,7 @@ const ROLE_INFO = {
 
 function fmt(n) { return 'Rs. ' + Math.round(n).toLocaleString(); }
 function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2600);
+  showMessage(msg);
 }
 
 /* ============ AUTH ============ */
@@ -52,7 +49,11 @@ function enterDashboard(user) {
   document.getElementById('sidebarRoleDesc').textContent = info.desc;
   document.querySelectorAll('#adminNav a').forEach(a => {
     const req = a.dataset.req;
-    if (req) a.classList.toggle('locked', !req.split(',').includes(user.role));
+    if (req) {
+      const allowed = req.split(',').includes(user.role);
+      a.classList.toggle('locked', !allowed);
+      a.hidden = user.role === 'employee' && !allowed;
+    }
   });
   setupMobilePanelNav();
   loadGatewayMode();
@@ -315,7 +316,7 @@ async function addPromoMessage() {
 async function editPromoMessage(id) {
   const item = ADMIN_PROMO_MESSAGES.find(message => message.id === id);
   if (!item) return;
-  const message = window.prompt('Edit promotional message', item.message);
+  const message = await requestText('Edit promotional message', item.message);
   if (message === null || !message.trim()) return;
   try { await API.put(`/api/admin/promo-messages/${id}`, { ...item, message: message.trim() }); await loadPromoMessagesAdmin(); showToast('Promotional message updated.'); }
   catch (error) { showToast(error.message); }
@@ -327,7 +328,7 @@ async function togglePromoMessage(id) {
   catch (error) { showToast(error.message); }
 }
 async function deletePromoMessage(id) {
-  if (!window.confirm('Delete this promotional message?')) return;
+  if (!await confirmAction('Delete this promotional message?', 'Delete message')) return;
   try { await API.delete(`/api/admin/promo-messages/${id}`); await loadPromoMessagesAdmin(); }
   catch (error) { showToast(error.message); }
 }
@@ -380,7 +381,7 @@ async function setCampaignVisibility(id, visible) {
   const body = { title: campaign.title, description: campaign.description, end_date: campaign.end_date, is_active: visible };
   try { await API.put(`/api/admin/deal-campaigns/${id}`, body); showToast(visible ? 'Container shown.' : 'Container hidden.'); loadCampaigns(); } catch (err) { showToast(err.message); }
 }
-async function deleteCampaign(id) { if (!window.confirm('Delete this deal container?')) return; try { await API.delete(`/api/admin/deal-campaigns/${id}`); showToast('Deal container deleted.'); loadCampaigns(); } catch (err) { showToast(err.message); } }
+async function deleteCampaign(id) { if (!await confirmAction('Delete this deal container?', 'Delete container')) return; try { await API.delete(`/api/admin/deal-campaigns/${id}`); showToast('Deal container deleted.'); loadCampaigns(); } catch (err) { showToast(err.message); } }
 function renderAdminDeals() {
   const filter = document.getElementById('dealStatusFilter')?.value || 'all';
   const list = ALL_DEALS.filter(d => filter === 'all' || d.status === filter);
@@ -429,7 +430,7 @@ async function saveDeal() {
   } catch (err) { showToast(err.message); }
 }
 async function deleteDeal(dealId) {
-  if (!window.confirm('Remove this deal? The original product will remain.')) return;
+  if (!await confirmAction('Remove this deal? The original product will remain.', 'Remove deal')) return;
   try { await API.delete(`/api/admin/deals/${dealId}`); showToast('Deal removed.'); loadDeals(); } catch (err) { showToast(err.message); }
 }
 function openAddProduct() { document.getElementById('addProductPanel').style.display = 'block'; document.getElementById('addProductPanel').scrollIntoView({ behavior: 'smooth' }); }
@@ -980,7 +981,7 @@ async function addMember() {
   } catch (err) { showToast(err.message); }
 }
 async function deleteMember(id) {
-  if (!confirm('Remove this member? They will no longer be able to log in.')) return;
+  if (!await confirmAction('Remove this member? They will no longer be able to log in.', 'Remove member')) return;
   try {
     await API.delete(`/api/employees/${id}`);
     showToast('Member removed.');

@@ -269,7 +269,7 @@ async function placeOrder() {
   const slot = document.getElementById('coSlot').value;
 
   if (!name || !phone || !address) {
-    alert('Please fill in your name, phone and delivery address.');
+    showMessage('Please fill in your name, phone and delivery address.');
     return;
   }
   const lines = cartLines().filter(l => l.p);
@@ -298,9 +298,9 @@ async function placeOrder() {
     const msg = res.paymentMethod === 'cod'
       ? `Order ${res.orderCode} confirmed! Pay cash when it arrives.`
       : `Order ${res.orderCode} created. Transfer to ${res.bankInstructions.bank} — ${res.bankInstructions.iban} (${res.bankInstructions.accountTitle}), and we'll confirm once received.`;
-    alert(msg);
+    showMessage(msg, 'Order placed');
   } catch (err) {
-    alert(err.message || 'Could not place your order — please try again.');
+    showMessage(err.message || 'Could not place your order — please try again.', 'Order not placed');
   } finally {
     btn.disabled = false; btn.textContent = originalText;
   }

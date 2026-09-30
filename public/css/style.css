@@ -270,6 +270,15 @@ footer.site-footer{ background:var(--footer-bg, var(--ink)); color:rgba(255,255,
 .modal-box{ background:var(--white); border-radius:22px; max-width:920px; width:100%; max-height:90vh; overflow-y:auto; padding:36px; position:relative; }
 .modal-box .close-x{ position:absolute; top:22px; right:22px; font-size:20px; color:var(--ink-soft); background:none; }
 .modal-box h2{ font-size:24px; margin-bottom:22px; }
+.ui-dialog-mask{ position:fixed; inset:0; z-index:12000; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(42,16,20,.52); animation:fadeIn .15s ease; }
+.ui-dialog{ width:min(100%, 440px); padding:28px; border-radius:8px; background:var(--white); box-shadow:0 18px 60px rgba(42,16,20,.24); }
+.ui-dialog h2{ font-size:22px; margin-bottom:10px; }
+.ui-dialog p{ color:var(--ink-soft); font-size:14px; line-height:1.6; overflow-wrap:anywhere; }
+.ui-dialog-input{ width:100%; margin-top:18px; padding:11px 12px; border:1.5px solid var(--line); border-radius:6px; font:inherit; }
+.ui-dialog-input:focus{ outline:2px solid var(--gold); outline-offset:2px; }
+.ui-dialog-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:24px; }
+.ui-dialog-actions .btn{ border-radius:6px; }
+.ui-dialog-actions .btn:hover{ transform:none; }
 .order-detail-modal{ max-width:1100px; }
 .order-detail-head{ display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:24px; }
 .order-detail-actions{ display:flex; gap:10px; flex-wrap:wrap; }
@@ -366,6 +375,7 @@ body.admin-body{ background:var(--paper); }
 .admin-nav a:hover{ background:rgba(255,255,255,0.06); color:var(--white); }
 .admin-nav a.active{ background:var(--white); color:var(--maroon); }
 .admin-nav .locked{ opacity:0.35; pointer-events:none; }
+.admin-nav a[hidden], .mobile-panel-menu a[hidden]{ display:none; }
 .admin-alert-dot{ display:inline-block; flex:0 0 12px; width:12px; height:12px; margin-left:auto; border:2px solid var(--white); border-radius:50%; background:#D92D20; box-shadow:0 0 0 2px rgba(217,45,32,.22); }
 .admin-alert-dot[hidden]{ display:none; }
 .admin-sidebar .role-badge{ margin-top:auto; background:rgba(255,255,255,0.08); border-radius:12px; padding:12px 14px; font-size:11.5px; }
@@ -452,6 +462,7 @@ table.admin-table img{ width:34px; height:34px; object-fit:contain; background:v
   .deal-campaign-content{ padding:34px 28px; }
 }
 @media (max-width:600px){
+  .admin-login-card{ padding:28px 22px; border-radius:16px; }
   .promo-ticker-track,.promo-ticker-group{ gap:10px; }
   .promo-ticker-track span{ padding:8px 6px; font-size:11.5px; }
   .collection-hero{ padding:14px 16px; gap:12px; }

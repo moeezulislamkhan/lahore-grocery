@@ -141,7 +141,7 @@ function initSupportWidget() {
       document.getElementById('askTicketId').textContent = `Form ID: ${res.formId}`;
       askForm.reset();
     } catch (err) {
-      alert(err.message || 'Could not send your message — please try again.');
+      showMessage(err.message || 'Could not send your message — please try again.', 'Message not sent');
     } finally {
       btn.disabled = false; btn.textContent = 'Send message';
     }

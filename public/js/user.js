@@ -25,15 +25,11 @@ function logout() {
 
 let userToastTimer;
 function showUserToast(message) {
-  const toast = document.getElementById('userToast');
-  toast.textContent = message;
-  toast.classList.add('show');
-  clearTimeout(userToastTimer);
-  userToastTimer = setTimeout(() => toast.classList.remove('show'), 3000);
+  showMessage(message);
 }
 
 async function cancelOrder(orderId) {
-  if (!window.confirm('Cancel this order?')) return;
+  if (!await confirmAction('Cancel this order?', 'Cancel order')) return;
   try {
     await API.patch(`/api/orders/${orderId}/cancel`, {});
     showUserToast('Order cancelled.');
