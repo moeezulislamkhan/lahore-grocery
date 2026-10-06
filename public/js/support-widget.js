@@ -74,6 +74,7 @@ function initSupportWidget() {
   const tabFaqBtn = document.getElementById('tabFaqBtn');
   const tabAskBtn = document.getElementById('tabAskBtn');
   const faqList = document.getElementById('faqList');
+  const escapeHtml = value => String(value).replace(/[&<>"']/g, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[character]);
   const askForm = document.getElementById('askForm');
   const askSuccess = document.getElementById('askSuccess');
 
@@ -91,8 +92,8 @@ function initSupportWidget() {
   API.get('/api/support/faqs').then(({ faqs }) => {
     faqList.innerHTML = faqs.map((f, i) => `
       <div class="faq-item${i === 0 ? ' open' : ''}">
-        <div class="faq-q">${f.q}<span class="chev">▾</span></div>
-        <div class="faq-a">${f.a}</div>
+        <div class="faq-q">${escapeHtml(f.q)}<span class="chev">▾</span></div>
+        <div class="faq-a">${escapeHtml(f.a)}</div>
       </div>
     `).join('');
     faqList.querySelectorAll('.faq-item').forEach(item => {

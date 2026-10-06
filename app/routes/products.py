@@ -15,6 +15,36 @@ def enrich_product(db, product):
     return result
 
 
+
+
+def parse_product_fields(body, existing=None):
+    source = {**(existing or {}), **(body or {})}
+    name = str(source.get('name') or '').strip()
+    category = str(source.get('category') or '').strip()
+    if not name or not category:
+        raise ValueError('Product name and category are required.')
+    if len(name) > 180 or len(category) > 120:
+        raise ValueError('Product name or category is too long.')
+    try:
+        price = float(source.get('price'))
+    except (TypeError, ValueError):
+        raise ValueError('Price must be a valid number.')
+    if price <= 0 or price > 100000000:
+        raise ValueError('Price must be greater than 0 and within a valid range.')
+    try:
+        stock = int(source.get('stock', 0))
+    except (TypeError, ValueError):
+        raise ValueError('Stock must be a whole number.')
+    if stock < 0 or stock > 100000000:
+        raise ValueError('Stock cannot be negative or exceed the allowed range.')
+    image = source.get('image')
+    tag = source.get('tag')
+    if image is not None and len(str(image)) > 1000:
+        raise ValueError('Image reference is too long.')
+    if tag is not None and len(str(tag)) > 60:
+        raise ValueError('Product tag is too long.')
+    return name, category, price, stock, image, tag
+
 def parse_sale_price(body, original_price):
     value = body.get('salePrice', body.get('sale_price'))
     if value in (None, ''):
@@ -83,19 +113,22 @@ def create_product():
         return jsonify(error='Admin or manager access required.'), 403
 
     body = request.get_json(silent=True) or {}
-    name, category, price = body.get('name'), body.get('category'), body.get('price')
-    if not name or not category or not price:
-        return jsonify(error='name, category and price are required.'), 400
-
     try:
+        name, category, price, stock, image, tag = parse_product_fields(body)
         sale_price = parse_sale_price(body, price)
     except ValueError as exc:
         return jsonify(error=str(exc)), 400
     unit = str(body.get('unit') or '').strip()
     if len(unit) > 40:
         return jsonify(error='Measurement unit must be 40 characters or fewer.'), 400
+    try:
+        old_price = float(body.get('oldPrice')) if body.get('oldPrice') not in (None, '') else None
+    except (TypeError, ValueError):
+        return jsonify(error='Old price must be a valid number.'), 400
+    if old_price is not None and old_price <= 0:
+        return jsonify(error='Old price must be greater than 0.'), 400
     cur = execute(db, 'INSERT INTO products (name, category, price, sale_price, old_price, stock, image, tag, unit) VALUES (?,?,?,?,?,?,?,?,?)',
-                  (name, category, price, sale_price or None, body.get('oldPrice'), body.get('stock', 0), body.get('image'), body.get('tag'), unit or None))
+                  (name, category, price, sale_price, old_price, stock, image, tag, unit or None))
     if hasattr(db, 'commit'):
         db.commit()
     product = query_one(db, 'SELECT * FROM products WHERE id = ?', (cur.lastrowid,))
@@ -115,16 +148,23 @@ def update_product(product_id):
 
     body = request.get_json(silent=True) or {}
     merged = {**existing, **body}
+    try:
+        name, category, price, stock, image, tag = parse_product_fields(body, existing)
+        sale_price = parse_sale_price(body, price) if ('salePrice' in body or 'sale_price' in body) else existing.get('sale_price')
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 400
     unit = str(merged.get('unit') or '').strip()
     if len(unit) > 40:
         return jsonify(error='Measurement unit must be 40 characters or fewer.'), 400
+    old_price_value = merged.get('old_price') if 'old_price' in merged else merged.get('oldPrice')
     try:
-        sale_price = parse_sale_price(body, merged['price']) if ('salePrice' in body or 'sale_price' in body) else existing.get('sale_price')
-    except ValueError as exc:
-        return jsonify(error=str(exc)), 400
+        old_price = float(old_price_value) if old_price_value not in (None, '') else None
+    except (TypeError, ValueError):
+        return jsonify(error='Old price must be a valid number.'), 400
+    if old_price is not None and old_price <= 0:
+        return jsonify(error='Old price must be greater than 0.'), 400
     execute(db, 'UPDATE products SET name=?, category=?, price=?, sale_price=?, old_price=?, stock=?, image=?, tag=?, unit=? WHERE id=?',
-            (merged['name'], merged['category'], merged['price'], sale_price or None, merged.get('old_price') or merged.get('oldPrice'),
-             merged['stock'], merged['image'], merged['tag'], unit or None, product_id))
+            (name, category, price, sale_price, old_price, stock, image, tag, unit or None, product_id))
     if hasattr(db, 'commit'):
         db.commit()
     product = query_one(db, 'SELECT * FROM products WHERE id = ?', (product_id,))

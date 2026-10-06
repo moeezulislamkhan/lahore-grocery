@@ -16,13 +16,23 @@
   <div class="wordmark"><span class="at" id="atSymbol">@</span>Shakarganj</div>
   <div class="dot" id="splashDot"></div>
   <div class="trolley-stage">
-    <div class="trolley-wrap">
-      <div class="trolley-badge"><img src="assets/trolley.png" alt="Shakarganj grocery trolley"></div>
-      <div class="tagline">Grocery at your doorstep<span class="sub">Fresh &middot; Fast &middot; Trusted since day one</span></div>
-      <div class="splash-actions">
-        <button class="btn" onclick="location.href='login.html?tab=register'">Get Started</button>
-        <button class="btn line" onclick="location.href='login.html?tab=login'">I already have an account</button>
+    <div class="splash-store-scene">
+      <div class="splash-copy">
+        <div class="splash-brand"><img src="assets/trolley.png" alt=""><span>Shakarganj Grocery</span></div>
+        <div class="eyebrow">Fresh &middot; Fast &middot; Trusted</div>
+        <h1>Your Everyday<br><em>Grocery Store</em></h1>
+        <p>Fresh groceries, quality products and premium Pink Salt — all in one place.</p>
+        <div class="splash-actions">
+          <button class="btn" onclick="enterStorefront()">Shop Now</button>
+          <button class="btn line" onclick="location.href='login.html?tab=register'">Get Started</button>
+        </div>
+        <a class="splash-signin" href="login.html?tab=login">Already have an account? Sign in</a>
       </div>
+      <div class="splash-product">
+        <span>Premium Pink Salt</span>
+        <img src="assets/grocery_category_assets/pink-salt.png" alt="Premium Pink Himalayan Salt">
+      </div>
+      <div class="splash-scene-caption">Everyday essentials, carefully selected.</div>
     </div>
   </div>
 </div>
@@ -73,7 +83,7 @@
       <div class="card tall collection-product-card"><img src="https://images.unsplash.com/photo-1610348725531-843dff563e2c?w=400&q=80" alt="Vegetables"><div class="p-name">Fresh Vegetable Box</div><div class="p-price">Rs. 850</div></div>
       <div class="card collection-product-card"><img src="https://images.unsplash.com/photo-1550583724-b2692b85b150?w=300&q=80" alt="Bread"><div class="p-name">Bakery Bread</div><div class="p-price">Rs. 180</div></div>
       <div class="card collection-product-card"><img src="https://images.unsplash.com/photo-1563636619-e9143da7973b?w=300&q=80" alt="Milk"><div class="p-name">Fresh Milk 1L</div><div class="p-price">Rs. 260</div></div>
-      <a class="btn collection-hero-button" id="featuredCollectionButton" href="collection.html?slug=pink-salt">Explore Collection</a>
+      <a class="btn collection-hero-button" id="featuredCollectionButton" href="category.html?collection=pink-salt">Explore Collection</a>
     </div>
   </section>
 
@@ -208,6 +218,7 @@
 <script src="js/site-settings.js?v=2"></script>
 <script src="js/support-widget.js?v=3"></script>
 <script src="js/collections.js?v=1"></script>
+<script src="js/category-assets.js?v=1"></script>
 <script src="js/app.js?v=4"></script>
 </body>
 </html>

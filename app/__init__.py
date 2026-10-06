@@ -1,7 +1,7 @@
 # app/__init__.py
 
 import os
-from flask import Flask, g, send_from_directory
+from flask import Flask, g, request, send_from_directory
 
 from app.db import get_connection, init_schema, migrate_order_status_schema, query_one, execute
 from app.auth import hash_password
@@ -22,14 +22,29 @@ def create_app():
     # so nothing is ever blocked by CORS.
     @app.after_request
     def add_cors_headers(response):
-        response.headers['Access-Control-Allow-Origin'] = '*'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, PATCH, DELETE, OPTIONS'
+        # Same-origin deployment is the default. Cross-origin access must be
+        # explicitly opted into with CORS_ALLOWED_ORIGIN; never use '*' for an
+        # authenticated API because it permits arbitrary sites to call it.
+        allowed_origin = os.environ.get('CORS_ALLOWED_ORIGIN', '').strip()
+        request_origin = request.headers.get('Origin', '').strip()
+        if allowed_origin and request_origin == allowed_origin:
+            response.headers['Access-Control-Allow-Origin'] = allowed_origin
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, PATCH, DELETE, OPTIONS'
+            response.headers['Vary'] = 'Origin'
         return response
 
     @app.route('/api/<path:_any>', methods=['OPTIONS'])
     def cors_preflight(_any):
-        return '', 204
+        response = app.make_response(('', 204))
+        allowed_origin = os.environ.get('CORS_ALLOWED_ORIGIN', '').strip()
+        request_origin = request.headers.get('Origin', '').strip()
+        if allowed_origin and request_origin == allowed_origin:
+            response.headers['Access-Control-Allow-Origin'] = allowed_origin
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, PATCH, DELETE, OPTIONS'
+            response.headers['Vary'] = 'Origin'
+        return response
 
     # ---- One DB connection per request, opened lazily and always closed --
     def get_db():

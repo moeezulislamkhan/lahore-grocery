@@ -53,7 +53,14 @@ def create_order():
         product = query_one(db, 'SELECT * FROM products WHERE id = ?', (item.get('productId'),))
         if not product:
             return jsonify(error=f"Product {item.get('productId')} not found."), 400
-        qty = max(1, int(item.get('qty') or 1))
+        try:
+            qty = int(item.get('qty') or 1)
+        except (TypeError, ValueError):
+            return jsonify(error='Quantity must be a whole number.'), 400
+        if qty < 1 or qty > 1000:
+            return jsonify(error='Quantity must be between 1 and 1000.'), 400
+        if int(product.get('stock') or 0) < qty:
+            return jsonify(error=f"Only {int(product.get('stock') or 0)} unit(s) of {product['name']} are currently available."), 409
         deal = active_deal_for_product(db, product['id'])
         unit_price = deal['final_price'] if deal else float(product['sale_price'] or product['price'])
         subtotal += unit_price * qty
@@ -77,7 +84,11 @@ def create_order():
         line_total = unit_price * qty
         execute(db, 'INSERT INTO order_items (order_id, product_id, product_name, product_name_snapshot, product_image_snapshot, variant_snapshot, unit_price, qty, discount, line_total) VALUES (?,?,?,?,?,?,?,?,?,?)',
                 (order_id, product['id'], product['name'], product['name'], product.get('image'), variant, unit_price, qty, 0.0, line_total))
-        execute(db, 'UPDATE products SET stock = MAX(0, stock - ?) WHERE id = ?', (qty, product['id']))
+        updated = execute(db, 'UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?', (qty, product['id'], qty))
+        if updated.rowcount != 1:
+            if hasattr(db, 'rollback'):
+                db.rollback()
+            return jsonify(error=f"{product['name']} is no longer available in the requested quantity."), 409
 
     if payment_method == 'cod':
         if hasattr(db, 'commit'):
@@ -293,6 +304,13 @@ def cancel_my_order(order_id):
             return jsonify(error='This order has already been cancelled.'), 409
         return jsonify(error='This order cannot be cancelled at its current status.'), 409
 
+    # Return reserved inventory exactly once, only after the status transition
+    # succeeded. The guarded UPDATE above prevents double cancellation/restock.
+    items = query_all(db, 'SELECT product_id, qty FROM order_items WHERE order_id = ?', (order_id,))
+    for item in items:
+        if item.get('product_id') is not None:
+            execute(db, 'UPDATE products SET stock = stock + ? WHERE id = ?', (int(item.get('qty') or 0), item['product_id']))
+
     if hasattr(db, 'commit'):
         db.commit()
     updated_order = query_one(db, 'SELECT * FROM orders WHERE id = ?', (order_id,))
@@ -346,8 +364,28 @@ def get_order(code):
         order = query_one(db, 'SELECT * FROM orders WHERE order_code = ?', (code,))
     if not order:
         return jsonify(error='Order not found.'), 404
-    payload = _serialize_order_detail(db, order)
-    return jsonify(order=payload['order'], items=payload['items'])
+
+    user = get_session_user(db, request)
+    is_staff = role_allowed(user, ['admin', 'manager', 'staff', 'employee'])
+    is_owner = bool(user and order.get('user_id') and int(order['user_id']) == int(user['id']))
+
+    if is_staff or is_owner:
+        payload = _serialize_order_detail(db, order)
+        return jsonify(order=payload['order'], items=payload['items'])
+
+    # Guest order tracking is intentionally limited to non-PII fields. The
+    # order code is already the lookup key used by the payment confirmation
+    # page, but it must never become a way to enumerate customer information.
+    return jsonify(order={
+        'order_code': order['order_code'],
+        'payment_method': order.get('payment_method'),
+        'payment_status': order.get('payment_status'),
+        'order_status': order.get('order_status'),
+        'subtotal': order.get('subtotal'),
+        'delivery_fee': order.get('delivery_fee'),
+        'total': order.get('total'),
+        'created_at': order.get('created_at'),
+    }, items=[])
 
 
 @bp.get('/<int:order_id>/detail')

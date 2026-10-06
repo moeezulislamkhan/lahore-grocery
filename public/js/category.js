@@ -3,10 +3,6 @@
 // homepage — items added here show up in the same cart on index.html and
 // vice versa, since both pages are on the same origin.
 
-const CATEGORY_ICONS = {
-  'Fruits & Vegetables': '🥕', 'Dairy & Eggs': '🥛', 'Bakery': '🍞',
-  'Rice, Atta & Pulses': '🍚', 'Beverages': '🧃', 'Household': '🧴', 'Meat & Poultry': '🍗',
-};
 function fmt(n) { return 'Rs. ' + Math.round(n).toLocaleString(); }
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
@@ -25,7 +21,7 @@ async function loadCategoryPage() {
     if (pickerSection) pickerSection.hidden = true;
   }
   document.getElementById('categoryTitle').textContent = currentCategory === 'All' ? 'All Products' : currentCategory;
-  document.getElementById('categoryBreadcrumb').innerHTML = `<a href="index.html" style="color:inherit;">Shop</a> &rsaquo; ${currentCategory === 'All' ? 'All Products' : currentCategory}`;
+  document.getElementById('categoryBreadcrumb').innerHTML = `<a href="index.html" style="color:inherit;">Shop</a> &rsaquo; ${escapeHtml(currentCategory === 'All' ? 'All Products' : currentCategory)}`;
 
   try {
     // The category picker row (and nav/footer) always reflects whatever
@@ -33,8 +29,9 @@ async function loadCategoryPage() {
     // data an Admin manages in the Admin Panel, so adding/renaming a
     // category there shows up here automatically.
     const { categories } = await API.get('/api/products/categories');
-    ALL_CATEGORY_NAMES = categories.map(c => c.category);
-    renderCategoryPicker(categories);
+    const validCategories = categories.filter(c => typeof c.category === 'string' && c.category.trim());
+    ALL_CATEGORY_NAMES = validCategories.map(c => c.category);
+    renderCategoryPicker(validCategories);
     renderTopNav();
     renderFooterShopList();
   } catch (err) {
@@ -69,12 +66,9 @@ async function loadCategoryPage() {
 }
 
 function renderCategoryPicker(categories) {
-  const allCard = `<a class="cat-card${currentCategory === 'All' ? ' active-cat' : ''}" href="category.html?name=All"><div class="emoji">🛒</div><div class="lbl">All Products</div></a>`;
+  const allCard = `<a class="cat-card${categoryCardClass('All Products')}${currentCategory === 'All' ? ' active-cat' : ''}" href="category.html?name=All">${categoryCardContent('All Products')}</a>`;
   const cards = categories.map(c => `
-    <a class="cat-card${c.category === currentCategory ? ' active-cat' : ''}" href="category.html?name=${encodeURIComponent(c.category)}">
-      <div class="emoji">${CATEGORY_ICONS[c.category] || '🛒'}</div>
-      <div class="lbl">${c.category}</div>
-    </a>
+    <a class="cat-card${categoryCardClass(c.category)}${c.category === currentCategory ? ' active-cat' : ''}" href="category.html?name=${encodeURIComponent(c.category)}">${categoryCardContent(c.category)}</a>
   `).join('');
   document.getElementById('categoryPicker').innerHTML = allCard + cards;
 }
@@ -83,13 +77,13 @@ function renderTopNav() {
   const navInner = document.getElementById('catNavInner');
   if (!navInner) return;
   navInner.innerHTML = `<a href="index.html">All Categories</a>` +
-    ALL_CATEGORY_NAMES.map(c => `<a href="category.html?name=${encodeURIComponent(c)}" class="${c === currentCategory ? 'active' : ''}">${c}</a>`).join('');
+    ALL_CATEGORY_NAMES.map(c => `<a href="category.html?name=${encodeURIComponent(c)}" class="${c === currentCategory ? 'active' : ''}">${escapeHtml(c)}</a>`).join('');
 }
 
 function renderFooterShopList() {
   const footerShop = document.getElementById('footerShopList');
   if (!footerShop) return;
-  footerShop.innerHTML = ALL_CATEGORY_NAMES.slice(0, 6).map(c => `<li><a href="category.html?name=${encodeURIComponent(c)}" style="color:inherit;">${c}</a></li>`).join('');
+  footerShop.innerHTML = ALL_CATEGORY_NAMES.slice(0, 6).map(c => `<li><a href="category.html?name=${encodeURIComponent(c)}" style="color:inherit;">${escapeHtml(c)}</a></li>`).join('');
 }
 
 function renderCategoryProducts() {
@@ -100,11 +94,11 @@ function renderCategoryProducts() {
   }
   grid.innerHTML = PRODUCTS.map(p => `
     <div class="p-card">
-      ${p.deal ? '<div class="tag sale">DEAL</div>' : (p.tag ? `<div class="tag ${p.tag === 'Sale' ? 'sale' : ''}">${p.tag}</div>` : (p.has_sale_price ? '<div class="tag sale">SALE</div>' : ''))}
-      <div class="img-wrap"><img src="${p.image}" alt="${p.name}"></div>
+      ${p.deal ? '<div class="tag sale">DEAL</div>' : (p.tag ? `<div class="tag ${p.tag === 'Sale' ? 'sale' : ''}">${escapeHtml(p.tag)}</div>` : (p.has_sale_price ? '<div class="tag sale">SALE</div>' : ''))}
+      <div class="img-wrap"><img src="${escapeHtml(p.image || '')}" alt="${escapeHtml(p.name)}"></div>
       <div class="body">
-        <div class="cat-lbl">${p.category}</div>
-        <div class="p-title">${p.name}</div>
+        <div class="cat-lbl">${escapeHtml(p.category)}</div>
+        <div class="p-title">${escapeHtml(p.name)}</div>
         <div class="row">
           <div class="price">${p.deal || p.has_sale_price ? `<span class="old">${fmt(p.price)}</span>${fmt(p.effective_price)}` : `${p.old_price ? `<span class="old">${fmt(p.old_price)}</span>` : ''}${fmt(p.price)}`}${p.unit ? `/${escapeHtml(p.unit.trim().replace(/^\/+/, ''))}` : ''}</div>
           <button class="add-btn" onclick="addToCart(${p.id})" ${p.stock === 0 ? 'disabled style="opacity:.35;cursor:not-allowed;"' : ''}>+</button>
@@ -122,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const grid = document.getElementById('categoryProductGrid');
       const filtered = q ? PRODUCTS.filter(p => p.name.toLowerCase().includes(q)) : PRODUCTS;
       if (filtered.length === 0) {
-        grid.innerHTML = `<p class="empty-note">No products match "${input.value}".</p>`;
+        grid.innerHTML = `<p class="empty-note">No products match "${escapeHtml(input.value)}".</p>`;
       } else {
         const saved = PRODUCTS; PRODUCTS = filtered; renderCategoryProducts(); PRODUCTS = saved;
       }

@@ -18,6 +18,7 @@
 })();
 
 function fmt(n) { return 'Rs. ' + Math.round(n).toLocaleString(); }
+function escapeHtml(value) { return String(value).replace(/[&<>"']/g, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[character]); }
 
 function logout() {
   API.logout().then(() => { location.href = 'login.html'; });
@@ -105,18 +106,18 @@ async function loadAccount() {
     const canAttemptCancellation = order => !['delivered', 'returned', 'cancelled'].includes(order.order_status);
     const rowHtml = (o) => `
       <tr>
-        <td>${o.order_code}</td>
+        <td>${escapeHtml(o.order_code)}</td>
         <td>${new Date(o.created_at).toLocaleDateString()}</td>
         <td>${fmt(o.total)}</td>
-        <td>${o.payment_method}</td>
-        <td><span class="pill ${o.order_status}">${o.order_status.replace(/_/g, ' ')}</span></td>
+        <td>${escapeHtml(o.payment_method)}</td>
+        <td><span class="pill ${escapeHtml(o.order_status)}">${escapeHtml(o.order_status.replace(/_/g, ' '))}</span></td>
         <td class="row-actions">${canAttemptCancellation(o) ? `<button class="del" onclick="cancelOrder(${o.id})">Cancel order</button>` : '—'}</td>
       </tr>`;
     const rows = orders.map(rowHtml).join('') || '<tr><td colspan="6" class="empty-note">No orders yet — go find something fresh!</td></tr>';
     document.getElementById('allOrdersTable').innerHTML = header + '<tbody>' + rows + '</tbody>';
     document.getElementById('recentOrdersTable').innerHTML = header + '<tbody>' + (orders.slice(0, 5).map(rowHtml).join('') || '<tr><td colspan="6" class="empty-note">No orders yet.</td></tr>') + '</tbody>';
   } catch (err) {
-    document.getElementById('allOrdersTable').innerHTML = `<tr><td class="empty-note">${err.message}</td></tr>`;
+    document.getElementById('allOrdersTable').innerHTML = `<tr><td class="empty-note">${escapeHtml(err.message)}</td></tr>`;
   }
 }
 

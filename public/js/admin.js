@@ -6,6 +6,8 @@ const ROLE_INFO = {
   staff: { label: 'Staff', desc: 'Products & orders only' },
   employee: { label: 'Employee', desc: 'Products, orders & store content' },
 };
+const CONTENT_MANAGEMENT_ROLES = ['admin', 'manager', 'employee'];
+const ANALYTICS_ROLES = ['admin', 'manager'];
 
 function fmt(n) { return 'Rs. ' + Math.round(n).toLocaleString(); }
 function showToast(msg) {
@@ -18,19 +20,30 @@ function showToast(msg) {
 // wrong-role visitor straight to the unified login page instead of showing
 // them an empty dashboard full of 403s. There is no login form on this page
 // at all — sign-in only happens through login.html.
-(function guard() {
+(async function guard() {
+  const token = API.token();
+  if (!token) {
+    location.href = 'login.html';
+    return;
+  }
+
   try {
-    const user = API.user();
-    if (!user || !API.token() || !['admin', 'manager', 'staff', 'employee'].includes(user.role)) {
+    const { user } = await API.get('/api/auth/me');
+    API.setUser(user);
+    if (!user || !['admin', 'manager', 'staff', 'employee'].includes(user.role)) {
       location.href = 'login.html';
       return;
     }
     enterDashboard(user);
   } catch (err) {
-    // Never let a single unexpected error (a bad CDN load, a stale/odd
-    // localStorage value, etc.) silently break every future nav click.
-    console.error('[admin] guard/enterDashboard failed:', err);
-    showToast('Something went wrong loading the dashboard — check the browser console.');
+    if (err.status === 401) {
+      API.setToken(null);
+      API.setUser(null);
+      location.href = 'login.html';
+      return;
+    }
+    console.error('[admin] session verification failed:', err);
+    showToast(err.message || 'Could not verify your session. Please reload the page.');
   }
 })();
 
@@ -61,16 +74,20 @@ function enterDashboard(user) {
   // Each of these manages its own try/catch internally and is independent —
   // if one fails (e.g. Chart.js didn't load from the CDN), the others and
   // all page navigation still work fine.
-  loadOverview();
+  if (ANALYTICS_ROLES.includes(user.role)) loadOverview();
   loadProducts();
-  loadDeals();
-  loadCampaigns();
-  loadCollectionsAdmin();
-  loadPromoMessagesAdmin();
+  if (CONTENT_MANAGEMENT_ROLES.includes(user.role)) {
+    loadDeals();
+    loadCampaigns();
+    loadCollectionsAdmin();
+    loadPromoMessagesAdmin();
+  }
   loadOrders();
   loadSupport();
-  loadSettings();
-  loadMembers();
+  if (user.role === 'admin') {
+    loadSettings();
+    loadMembers();
+  }
 }
 
 /* ============ NAVIGATION ============ */
@@ -185,7 +202,7 @@ async function loadOverview() {
     }
 
     document.getElementById('topProductsList').innerHTML = s.topProducts.length
-      ? s.topProducts.map(p => `<div class="top-prod-row"><div class="name">${p.name}</div><div class="amt">${fmt(p.revenue)}</div></div>`).join('')
+      ? s.topProducts.map(p => `<div class="top-prod-row"><div class="name">${escapeHtml(p.name)}</div><div class="amt">${fmt(p.revenue)}</div></div>`).join('')
       : '<p class="empty-note">No sales yet.</p>';
   } catch (err) {
     // KPI cards hidden from staff role — expected 403, show placeholders instead
@@ -209,9 +226,9 @@ function renderAdminProducts(filter = '') {
     const status = p.stock === 0 ? '<span class="pill out">Out of stock</span>' : p.stock < 15 ? '<span class="pill low">Low stock</span>' : '<span class="pill instock">In stock</span>';
     const unitSuffix = p.unit ? '/' + escapeHtml(p.unit.trim().replace(/^\/+/, '')) : '';
     return `<tr>
-      <td><img src="${p.image}"></td>
-      <td>${p.name}</td>
-      <td>${p.category}</td>
+      <td><img src="${escapeHtml(p.image || '')}"></td>
+      <td>${escapeHtml(p.name)}</td>
+      <td>${escapeHtml(p.category)}</td>
       <td>${p.sale_price && p.sale_price < p.price ? `<span class="old">${fmt(p.price)}</span>${fmt(p.sale_price)}` : fmt(p.price)}${unitSuffix}</td>
       <td>${p.stock}</td>
       <td>${status}</td>
@@ -236,7 +253,7 @@ async function loadCollectionsAdmin() {
       return;
     }
     document.getElementById('collectionTitle').value = PINK_SALT_COLLECTION.title;
-    document.getElementById('collectionProductsTbody').innerHTML = PINK_SALT_COLLECTION.products.map(product => `<tr><td>${product.name}</td><td>${product.category}</td><td>${fmt(product.effective_price || product.price)}</td><td class="row-actions"><button class="del" onclick="removeCollectionProduct(${product.id})">Remove</button></td></tr>`).join('') || '<tr><td colspan="4" class="empty-note">No products added to Pink Salt Collection yet.</td></tr>';
+    document.getElementById('collectionProductsTbody').innerHTML = PINK_SALT_COLLECTION.products.map(product => `<tr><td>${escapeHtml(product.name)}</td><td>${escapeHtml(product.category)}</td><td>${fmt(product.effective_price || product.price)}</td><td class="row-actions"><button class="del" onclick="removeCollectionProduct(${product.id})">Remove</button></td></tr>`).join('') || '<tr><td colspan="4" class="empty-note">No products added to Pink Salt Collection yet.</td></tr>';
   } catch (error) { console.error('[admin] Could not load collections:', error); }
 }
 async function saveCollectionTitle() {
@@ -358,7 +375,7 @@ function renderAdminCampaigns() {
   const filter = document.getElementById('campaignStatusFilter')?.value || 'all';
   const list = ALL_CAMPAIGNS.filter(c => filter === 'all' || c.status === filter);
   document.getElementById('campaignCount').textContent = list.length + ' containers';
-  document.getElementById('adminCampaignsTbody').innerHTML = list.map(c => `<tr><td><strong>${c.title}</strong></td><td style="max-width:280px;">${c.description}</td><td style="font-size:11px;">${campaignDate(c.end_date)}</td><td><span class="pill ${c.status === 'active' ? 'active' : c.status === 'expired' ? 'out' : 'pending'}">${c.status}</span></td><td class="row-actions"><button onclick="openCampaignForm(${c.id})">Edit</button>${c.status === 'disabled' ? `<button onclick="setCampaignVisibility(${c.id}, true)">Show</button>` : `<button onclick="setCampaignVisibility(${c.id}, false)">Hide</button>`}<button class="del" onclick="deleteCampaign(${c.id})">Delete</button></td></tr>`).join('') || '<tr><td colspan="5" class="empty-note">No deal containers published yet.</td></tr>';
+  document.getElementById('adminCampaignsTbody').innerHTML = list.map(c => `<tr><td><strong>${escapeHtml(c.title)}</strong></td><td style="max-width:280px;">${escapeHtml(c.description)}</td><td style="font-size:11px;">${campaignDate(c.end_date)}</td><td><span class="pill ${c.status === 'active' ? 'active' : c.status === 'expired' ? 'out' : 'pending'}">${c.status}</span></td><td class="row-actions"><button onclick="openCampaignForm(${c.id})">Edit</button>${c.status === 'disabled' ? `<button onclick="setCampaignVisibility(${c.id}, true)">Show</button>` : `<button onclick="setCampaignVisibility(${c.id}, false)">Hide</button>`}<button class="del" onclick="deleteCampaign(${c.id})">Delete</button></td></tr>`).join('') || '<tr><td colspan="5" class="empty-note">No deal containers published yet.</td></tr>';
 }
 function openCampaignForm(id = null) {
   CURRENT_EDIT_CAMPAIGN_ID = id;
@@ -401,7 +418,7 @@ function openDealForm(dealId = null) {
   const deal = dealId ? ALL_DEALS.find(d => d.id === dealId) : null;
   const productSelect = document.getElementById('dealProduct');
   const assigned = new Set(ALL_DEALS.filter(d => d.id !== dealId).map(d => d.product_id));
-  productSelect.innerHTML = ALL_PRODUCTS.filter(p => !assigned.has(p.id) || (deal && p.id === deal.product_id)).map(p => `<option value="${p.id}">${p.name} — ${fmt(p.price)}</option>`).join('');
+  productSelect.innerHTML = ALL_PRODUCTS.filter(p => !assigned.has(p.id) || (deal && p.id === deal.product_id)).map(p => `<option value="${p.id}">${escapeHtml(p.name)} — ${fmt(p.price)}</option>`).join('');
   if (deal) {
     document.getElementById('dealFormTitle').textContent = 'Edit deal';
     productSelect.value = deal.product_id;
@@ -606,10 +623,10 @@ function renderOrderDetailModal(payload) {
       <tr>
         <td><img src="${image || 'assets/trolley.png'}" alt="${(item.product_name || item.product_name_snapshot || 'Product').replace(/"/g, '&quot;')}" /></td>
         <td>
-          <strong>${item.product_name || item.product_name_snapshot || 'Product'}</strong><br>
+          <strong>${escapeHtml(item.product_name || item.product_name_snapshot || 'Product')}</strong><br>
           <span style="color:var(--ink-soft); font-size:11px;">ID: ${item.product_id || '—'}${item.variant_snapshot ? ` · ${item.variant_snapshot}` : ''}</span>
         </td>
-        <td>${item.variant_snapshot || '—'}</td>
+        <td>${escapeHtml(item.variant_snapshot || '—')}</td>
         <td>${qty}</td>
         <td>${fmt(price)}</td>
         <td>${fmt(Number(item.discount || 0))}</td>
@@ -617,7 +634,7 @@ function renderOrderDetailModal(payload) {
       </tr>`;
   }).join('') || '<tr><td colspan="7" class="empty-note">No products were recorded for this order.</td></tr>';
 
-  document.getElementById('orderDetailTitle').textContent = `Order ${order.order_code || ''}`;
+  document.getElementById('orderDetailTitle').textContent = `Order ${escapeHtml(order.order_code || '')}`;
   document.getElementById('orderDetailContent').innerHTML = `
     <div class="order-section">
       <h3>Order Overview</h3>
@@ -625,22 +642,22 @@ function renderOrderDetailModal(payload) {
         <div class="field"><label>Order ID</label><span>${order.order_code || '—'}</span></div>
         <div class="field"><label>Order Date</label><span>${order.created_at ? new Date(order.created_at).toLocaleString() : '—'}</span></div>
         <div class="field"><label>Current Status</label><span>${renderStatusPill(order.order_status)}</span></div>
-        <div class="field"><label>Payment Method</label><span>${order.payment_method || '—'}</span></div>
+        <div class="field"><label>Payment Method</label><span>${escapeHtml(order.payment_method || '—')}</span></div>
         <div class="field"><label>Payment Status</label><span>${renderStatusPill(order.payment_status)}</span></div>
-        <div class="field"><label>Reference</label><span>${order.gateway_txn_ref || 'Not Provided'}</span></div>
+        <div class="field"><label>Reference</label><span>${escapeHtml(order.gateway_txn_ref || 'Not Provided')}</span></div>
       </div>
     </div>
     <div class="order-section">
       <h3>Customer Details</h3>
       <div class="order-grid">
-        <div class="field"><label>Full Name</label><span>${order.customer_name || 'Not Provided'}</span></div>
-        <div class="field"><label>Email</label><span>${order.customer_email || 'Not Provided'}</span></div>
-        <div class="field"><label>Phone</label><span>${order.customer_phone || order.phone || 'Not Provided'}</span></div>
+        <div class="field"><label>Full Name</label><span>${escapeHtml(order.customer_name || 'Not Provided')}</span></div>
+        <div class="field"><label>Email</label><span>${escapeHtml(order.customer_email || 'Not Provided')}</span></div>
+        <div class="field"><label>Phone</label><span>${escapeHtml(order.customer_phone || order.phone || 'Not Provided')}</span></div>
         <div class="field"><label>Customer ID</label><span>${order.user_id || 'Not Provided'}</span></div>
-        <div class="field"><label>Delivery Address</label><span>${order.address || 'Not Provided'}</span></div>
-        <div class="field"><label>City</label><span>${order.city || 'Not Provided'}</span></div>
-        <div class="field"><label>Postal Code</label><span>${order.postal_code || 'Not Provided'}</span></div>
-        <div class="field"><label>Delivery Instructions</label><span>${order.delivery_instructions || 'Not Provided'}</span></div>
+        <div class="field"><label>Delivery Address</label><span>${escapeHtml(order.address || 'Not Provided')}</span></div>
+        <div class="field"><label>City</label><span>${escapeHtml(order.city || 'Not Provided')}</span></div>
+        <div class="field"><label>Postal Code</label><span>${escapeHtml(order.postal_code || 'Not Provided')}</span></div>
+        <div class="field"><label>Delivery Instructions</label><span>${escapeHtml(order.delivery_instructions || 'Not Provided')}</span></div>
       </div>
     </div>
     <div class="order-section">
@@ -660,9 +677,9 @@ function renderOrderDetailModal(payload) {
           <div class="line total"><span>Grand Total</span><strong>${fmt(total)}</strong></div>
         </div>
         <div class="order-summary-box">
-          <div class="line"><span>Payment Method</span><strong>${order.payment_method || '—'}</strong></div>
+          <div class="line"><span>Payment Method</span><strong>${escapeHtml(order.payment_method || '—')}</strong></div>
           <div class="line"><span>Payment Status</span><strong>${statusLabel(order.payment_status)}</strong></div>
-          <div class="line"><span>Transaction</span><strong>${order.gateway_txn_ref || 'Not Provided'}</strong></div>
+          <div class="line"><span>Transaction</span><strong>${escapeHtml(order.gateway_txn_ref || 'Not Provided')}</strong></div>
           <div class="line"><span>Order Status</span><strong>${statusLabel(order.order_status)}</strong></div>
         </div>
       </div>
@@ -739,15 +756,15 @@ function printReceiptHtml(payload) {
           <div class="meta">
             <div>Order ID: ${order.order_code || '—'}</div>
             <div>Date: ${order.created_at ? new Date(order.created_at).toLocaleString() : '—'}</div>
-            <div>Customer: ${order.customer_name || 'Not Provided'}</div>
-            <div>Phone: ${order.customer_phone || order.phone || 'Not Provided'}</div>
-            <div>Email: ${order.customer_email || 'Not Provided'}</div>
-            <div>Address: ${order.address || 'Not Provided'}</div>
+            <div>Customer: ${escapeHtml(order.customer_name || 'Not Provided')}</div>
+            <div>Phone: ${escapeHtml(order.customer_phone || order.phone || 'Not Provided')}</div>
+            <div>Email: ${escapeHtml(order.customer_email || 'Not Provided')}</div>
+            <div>Address: ${escapeHtml(order.address || 'Not Provided')}</div>
           </div>
           <table>
             <thead><tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
             <tbody>
-              ${(items || []).map(item => `<tr><td>${item.product_name || item.product_name_snapshot || 'Product'}</td><td>${item.qty || 0}</td><td>${fmt(Number(item.unit_price || 0))}</td><td>${fmt(Number(item.line_total || (Number(item.unit_price || 0) * Number(item.qty || 0))))}</td></tr>`).join('') || '<tr><td colspan="4">No items recorded.</td></tr>'}
+              ${(items || []).map(item => `<tr><td>${escapeHtml(item.product_name || item.product_name_snapshot || 'Product')}</td><td>${item.qty || 0}</td><td>${fmt(Number(item.unit_price || 0))}</td><td>${fmt(Number(item.line_total || (Number(item.unit_price || 0) * Number(item.qty || 0))))}</td></tr>`).join('') || '<tr><td colspan="4">No items recorded.</td></tr>'}
             </tbody>
           </table>
           <div class="totals">
@@ -757,10 +774,10 @@ function printReceiptHtml(payload) {
             <div class="totals-row grand"><span>Grand Total</span><span>${fmt(total)}</span></div>
           </div>
           <div class="meta" style="margin-top:18px;">
-            <div>Payment Method: ${order.payment_method || '—'}</div>
+            <div>Payment Method: ${escapeHtml(order.payment_method || '—')}</div>
             <div>Payment Status: ${statusLabel(order.payment_status)}</div>
             <div>Order Status: ${statusLabel(order.order_status)}</div>
-            <div>Transaction: ${order.gateway_txn_ref || 'Not Provided'}</div>
+            <div>Transaction: ${escapeHtml(order.gateway_txn_ref || 'Not Provided')}</div>
           </div>
           <div class="footer">Thank you for shopping with us!</div>
         </div>
@@ -798,21 +815,21 @@ function generatePdfReceipt(payload) {
   const pageWidth = doc.internal.pageSize.getWidth();
   doc.setFontSize(20); doc.text('Shakarganj Grocery', margin, 52);
   doc.setFontSize(10); doc.text(`Order ID: ${order.order_code || '—'}`, margin, 80); doc.text(`Date: ${order.created_at ? new Date(order.created_at).toLocaleString() : '—'}`, margin + 220, 80);
-  doc.text(`Customer: ${order.customer_name || 'Not Provided'}`, margin, 100); doc.text(`Phone: ${order.customer_phone || order.phone || 'Not Provided'}`, margin + 220, 100);
-  doc.text(`Email: ${order.customer_email || 'Not Provided'}`, margin, 120); doc.text(`Address: ${order.address || 'Not Provided'}`, margin + 220, 120);
+  doc.text(`Customer: ${escapeHtml(order.customer_name || 'Not Provided')}`, margin, 100); doc.text(`Phone: ${escapeHtml(order.customer_phone || order.phone || 'Not Provided')}`, margin + 220, 100);
+  doc.text(`Email: ${escapeHtml(order.customer_email || 'Not Provided')}`, margin, 120); doc.text(`Address: ${escapeHtml(order.address || 'Not Provided')}`, margin + 220, 120);
   doc.setDrawColor(207, 207, 207); doc.line(margin, 140, pageWidth - margin, 140);
   let y = 165;
   doc.setFontSize(11); doc.text('Product', margin, y); doc.text('Qty', 300, y); doc.text('Unit Price', 370, y); doc.text('Total', 470, y);
   y += 14;
   (items || []).forEach(item => {
-    const line = `${item.product_name || item.product_name_snapshot || 'Product'} (${item.variant_snapshot || 'Standard'})`;
+    const line = `${escapeHtml(item.product_name || item.product_name_snapshot || 'Product')} (${item.variant_snapshot || 'Standard'})`;
     doc.setFontSize(10); const split = doc.splitTextToSize(line, 200); doc.text(split, margin, y); doc.text(String(item.qty || 0), 300, y); doc.text(fmt(Number(item.unit_price || 0)).replace('Rs. ', ''), 370, y); doc.text(fmt(Number(item.line_total || Number(item.unit_price || 0) * Number(item.qty || 0))).replace('Rs. ', ''), 470, y);
     y += 18 + ((split.length - 1) * 10);
     if (y > 720) { doc.addPage(); y = 40; }
   });
   doc.setDrawColor(207, 207, 207); doc.line(margin, y + 8, pageWidth - margin, y + 8); y += 22;
   doc.setFontSize(10); doc.text(`Subtotal: ${fmt(Number(order.subtotal || 0))}`, margin + 300, y); y += 16; doc.text(`Delivery: ${fmt(Number(order.delivery_fee || 0))}`, margin + 300, y); y += 16; doc.text(`Discount: ${fmt(Number(order.discount || 0))}`, margin + 300, y); y += 20; doc.setFontSize(12); doc.text(`Grand Total: ${fmt(Number(order.total || 0))}`, margin + 300, y);
-  y += 28; doc.setFontSize(10); doc.text(`Payment Method: ${order.payment_method || '—'}`, margin, y); y += 14; doc.text(`Payment Status: ${statusLabel(order.payment_status)}`, margin, y); y += 14; doc.text(`Order Status: ${statusLabel(order.order_status)}`, margin, y); y += 14; doc.text(`Transaction: ${order.gateway_txn_ref || 'Not Provided'}`, margin, y);
+  y += 28; doc.setFontSize(10); doc.text(`Payment Method: ${escapeHtml(order.payment_method || '—')}`, margin, y); y += 14; doc.text(`Payment Status: ${statusLabel(order.payment_status)}`, margin, y); y += 14; doc.text(`Order Status: ${statusLabel(order.order_status)}`, margin, y); y += 14; doc.text(`Transaction: ${escapeHtml(order.gateway_txn_ref || 'Not Provided')}`, margin, y);
   doc.setFontSize(11); doc.text('Thank you for shopping with us!', margin, 790, { align: 'center' });
   const filename = `Receipt_${order.order_code || 'order'}.pdf`;
   doc.save(filename);
@@ -848,9 +865,9 @@ async function loadSupport() {
     const header = `<thead><tr><th>From</th><th>Topic</th><th>Message</th><th>Status</th><th>Actions</th></tr></thead>`;
     const rows = messages.map(m => `
       <tr>
-        <td>${m.name}<br><span style="color:var(--ink-soft); font-size:11px;">${m.email}</span></td>
-        <td>${m.topic || 'General'}</td>
-        <td style="max-width:280px;">${m.message}</td>
+        <td>${escapeHtml(m.name)}<br><span style="color:var(--ink-soft); font-size:11px;">${escapeHtml(m.email)}</span></td>
+        <td>${escapeHtml(m.topic || 'General')}</td>
+        <td style="max-width:280px;">${escapeHtml(m.message)}</td>
         <td><span class="pill ${m.status}">${m.status}</span></td>
         <td class="row-actions">${m.status === 'open' ? `<button onclick="resolveSupport(${m.id})">Mark resolved</button>` : ''}</td>
       </tr>`).join('');
@@ -953,9 +970,9 @@ function renderMembers(filter = '') {
   document.getElementById('membersTbody').innerHTML = list.map(m => {
     const created = new Date(m.created_at).toLocaleDateString();
     return `<tr>
-      <td>${m.name}</td>
-      <td>${m.email}</td>
-      <td>${m.role}</td>
+      <td>${escapeHtml(m.name)}</td>
+      <td>${escapeHtml(m.email)}</td>
+      <td>${escapeHtml(m.role)}</td>
       <td>${created}</td>
       <td class="row-actions"><button class="del" onclick="deleteMember(${m.id})">Remove</button></td>
     </tr>`;

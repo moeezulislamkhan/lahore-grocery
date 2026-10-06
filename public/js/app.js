@@ -80,6 +80,13 @@ function startSplash() {
 // tool to remember "already saw the intro this session" without needing any
 // bigger routing/state rework.
 const INTRO_SEEN_KEY = 'sg_intro_seen';
+function enterStorefront() {
+  sessionStorage.setItem(INTRO_SEEN_KEY, '1');
+  splashDone = true;
+  splash.style.display = 'none';
+  document.getElementById('app').classList.add('ready');
+}
+
 if (sessionStorage.getItem(INTRO_SEEN_KEY)) {
   splashDone = true;
   splash.style.display = 'none';
@@ -91,10 +98,6 @@ if (sessionStorage.getItem(INTRO_SEEN_KEY)) {
   startSplash();
 }
 /* ============ PRODUCT CATALOG (from API) ============ */
-const CATEGORY_ICONS = {
-  'Fruits & Vegetables': '🥕', 'Dairy & Eggs': '🥛', 'Bakery': '🍞',
-  'Rice, Atta & Pulses': '🍚', 'Beverages': '🧃', 'Household': '🧴', 'Meat & Poultry': '🍗',
-};
 let PRODUCTS = [];
 let ALL_PRODUCTS = [];
 let searchRequestId = 0;
@@ -145,11 +148,8 @@ async function searchProducts(value) {
 }
 
 function renderCategories() {
-  const cats = [...new Set(PRODUCTS.map(p => p.category))];
-  const cards = cats.map(c => {
-    const icon = CATEGORY_ICONS[c] || '🛒';
-    return '<a class="cat-card" href="category.html?name=' + encodeURIComponent(c) + '"><div class="emoji">' + icon + '</div><div class="lbl">' + c + '</div></a>';
-  }).join('');
+  const cats = [...new Set(PRODUCTS.map(p => p.category).filter(category => typeof category === 'string' && category.trim()))];
+  const cards = cats.map(c => `<a class="cat-card${categoryCardClass(c)}" href="category.html?name=${encodeURIComponent(c)}">${categoryCardContent(c)}</a>`).join('');
   document.getElementById('catGrid').innerHTML = cards;
 
   const navInner = document.getElementById('catNavInner');
@@ -180,9 +180,9 @@ function escapeHtml(value) {
 }
 
 function productCardHtml(p) {
-  const saleTag = p.deal ? '<div class="tag sale">DEAL</div>' : (p.tag ? '<div class="tag' + (p.tag === 'Sale' ? ' sale' : '') + '">' + p.tag + '</div>' : (p.has_sale_price ? '<div class="tag sale">SALE</div>' : ''));
+  const saleTag = p.deal ? '<div class="tag sale">DEAL</div>' : (p.tag ? '<div class="tag' + (p.tag === 'Sale' ? ' sale' : '') + '">' + escapeHtml(p.tag) + '</div>' : (p.has_sale_price ? '<div class="tag sale">SALE</div>' : ''));
   const disabled = p.stock === 0 ? 'disabled style="opacity:.35;cursor:not-allowed;"' : '';
-  return '<div class="p-card">' + saleTag + '<div class="img-wrap"><img src="' + p.image + '" alt="' + p.name + '"></div><div class="body"><div class="cat-lbl">' + p.category + '</div><div class="p-title">' + p.name + '</div><div class="row"><div class="price">' + productPriceHtml(p) + '</div><button class="add-btn" onclick="addToCart(' + p.id + ')" ' + disabled + '>+</button></div></div></div>';
+  return '<div class="p-card">' + saleTag + '<div class="img-wrap"><img src="' + escapeHtml(p.image || '') + '" alt="' + escapeHtml(p.name) + '"></div><div class="body"><div class="cat-lbl">' + escapeHtml(p.category) + '</div><div class="p-title">' + escapeHtml(p.name) + '</div><div class="row"><div class="price">' + productPriceHtml(p) + '</div><button class="add-btn" onclick="addToCart(' + p.id + ')" ' + disabled + '>+</button></div></div></div>';
 }
 
 function renderProducts(showAll = false) {
