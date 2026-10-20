@@ -4,6 +4,7 @@ from flask import Blueprint, request, jsonify, current_app
 from app.db import query_one, query_all, execute
 from app.sessions import get_session_user, role_allowed
 from app.deal_utils import active_deal_for_product
+from app.product_images import save_product_image, remove_unreferenced_image
 
 
 def enrich_product(db, product):
@@ -37,7 +38,7 @@ def parse_product_fields(body, existing=None):
         raise ValueError('Stock must be a whole number.')
     if stock < 0 or stock > 100000000:
         raise ValueError('Stock cannot be negative or exceed the allowed range.')
-    image = source.get('image')
+    image = source.get('image') or None
     tag = source.get('tag')
     if image is not None and len(str(image)) > 1000:
         raise ValueError('Image reference is too long.')
@@ -58,6 +59,24 @@ def parse_sale_price(body, original_price):
     return value
 
 bp = Blueprint('products', __name__, url_prefix='/api/products')
+
+
+def product_request_body():
+    if request.mimetype == 'multipart/form-data':
+        return request.form.to_dict()
+    return request.get_json(silent=True) or {}
+
+
+def uploaded_image():
+    file = request.files.get('image_file')
+    if file is None or not file.filename:
+        return None
+    return save_product_image(file, current_app.config['PRODUCT_IMAGE_UPLOAD_DIR'])
+
+
+def cleanup_replaced_image(db, old_image, new_image):
+    if old_image and old_image != new_image:
+        remove_unreferenced_image(db, old_image, current_app.config['PRODUCT_IMAGE_UPLOAD_DIR'])
 
 
 @bp.get('')
@@ -112,7 +131,7 @@ def create_product():
     if not role_allowed(user, ['admin', 'manager', 'staff', 'employee']):
         return jsonify(error='Admin or manager access required.'), 403
 
-    body = request.get_json(silent=True) or {}
+    body = product_request_body()
     try:
         name, category, price, stock, image, tag = parse_product_fields(body)
         sale_price = parse_sale_price(body, price)
@@ -127,10 +146,23 @@ def create_product():
         return jsonify(error='Old price must be a valid number.'), 400
     if old_price is not None and old_price <= 0:
         return jsonify(error='Old price must be greater than 0.'), 400
-    cur = execute(db, 'INSERT INTO products (name, category, price, sale_price, old_price, stock, image, tag, unit) VALUES (?,?,?,?,?,?,?,?,?)',
-                  (name, category, price, sale_price, old_price, stock, image, tag, unit or None))
-    if hasattr(db, 'commit'):
-        db.commit()
+    try:
+        saved_image = uploaded_image()
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 400
+    if saved_image:
+        image = saved_image
+    try:
+        cur = execute(db, 'INSERT INTO products (name, category, price, sale_price, old_price, stock, image, tag, unit) VALUES (?,?,?,?,?,?,?,?,?)',
+                      (name, category, price, sale_price, old_price, stock, image, tag, unit or None))
+        if hasattr(db, 'commit'):
+            db.commit()
+    except Exception:
+        if hasattr(db, 'rollback'):
+            db.rollback()
+        if saved_image:
+            remove_unreferenced_image(db, saved_image, current_app.config['PRODUCT_IMAGE_UPLOAD_DIR'])
+        raise
     product = query_one(db, 'SELECT * FROM products WHERE id = ?', (cur.lastrowid,))
     return jsonify(product=product), 201
 
@@ -146,7 +178,7 @@ def update_product(product_id):
     if not existing:
         return jsonify(error='Product not found.'), 404
 
-    body = request.get_json(silent=True) or {}
+    body = product_request_body()
     merged = {**existing, **body}
     try:
         name, category, price, stock, image, tag = parse_product_fields(body, existing)
@@ -163,10 +195,24 @@ def update_product(product_id):
         return jsonify(error='Old price must be a valid number.'), 400
     if old_price is not None and old_price <= 0:
         return jsonify(error='Old price must be greater than 0.'), 400
-    execute(db, 'UPDATE products SET name=?, category=?, price=?, sale_price=?, old_price=?, stock=?, image=?, tag=?, unit=? WHERE id=?',
-            (name, category, price, sale_price, old_price, stock, image, tag, unit or None, product_id))
-    if hasattr(db, 'commit'):
-        db.commit()
+    try:
+        saved_image = uploaded_image()
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 400
+    if saved_image:
+        image = saved_image
+    try:
+        execute(db, 'UPDATE products SET name=?, category=?, price=?, sale_price=?, old_price=?, stock=?, image=?, tag=?, unit=? WHERE id=?',
+                (name, category, price, sale_price, old_price, stock, image, tag, unit or None, product_id))
+        if hasattr(db, 'commit'):
+            db.commit()
+    except Exception:
+        if hasattr(db, 'rollback'):
+            db.rollback()
+        if saved_image:
+            remove_unreferenced_image(db, saved_image, current_app.config['PRODUCT_IMAGE_UPLOAD_DIR'])
+        raise
+    cleanup_replaced_image(db, existing.get('image'), image)
     product = query_one(db, 'SELECT * FROM products WHERE id = ?', (product_id,))
     return jsonify(product=enrich_product(db, product))
 
@@ -185,4 +231,5 @@ def delete_product(product_id):
     execute(db, 'DELETE FROM products WHERE id = ?', (product_id,))
     if hasattr(db, 'commit'):
         db.commit()
+    cleanup_replaced_image(db, existing.get('image'), None)
     return jsonify(success=True)

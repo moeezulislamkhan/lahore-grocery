@@ -16,10 +16,6 @@ let PRODUCTS = []; // only the products for currentCategory — used by cartLine
 let ALL_CATEGORY_NAMES = [];
 
 async function loadCategoryPage() {
-  if (currentCollectionSlug) {
-    const pickerSection = document.getElementById('categoryPickerSection');
-    if (pickerSection) pickerSection.hidden = true;
-  }
   document.getElementById('categoryTitle').textContent = currentCategory === 'All' ? 'All Products' : currentCategory;
   document.getElementById('categoryBreadcrumb').innerHTML = `<a href="index.html" style="color:inherit;">Shop</a> &rsaquo; ${escapeHtml(currentCategory === 'All' ? 'All Products' : currentCategory)}`;
 
@@ -31,11 +27,10 @@ async function loadCategoryPage() {
     const { categories } = await API.get('/api/products/categories');
     const validCategories = categories.filter(c => typeof c.category === 'string' && c.category.trim());
     ALL_CATEGORY_NAMES = validCategories.map(c => c.category);
-    renderCategoryPicker(validCategories);
     renderTopNav();
     renderFooterShopList();
   } catch (err) {
-    document.getElementById('categoryPicker').innerHTML = '';
+    console.error('[category] Could not load categories:', err);
   }
 
   try {
@@ -65,14 +60,6 @@ async function loadCategoryPage() {
   }
 }
 
-function renderCategoryPicker(categories) {
-  const allCard = `<a class="cat-card${categoryCardClass('All Products')}${currentCategory === 'All' ? ' active-cat' : ''}" href="category.html?name=All">${categoryCardContent('All Products')}</a>`;
-  const cards = categories.map(c => `
-    <a class="cat-card${categoryCardClass(c.category)}${c.category === currentCategory ? ' active-cat' : ''}" href="category.html?name=${encodeURIComponent(c.category)}">${categoryCardContent(c.category)}</a>
-  `).join('');
-  document.getElementById('categoryPicker').innerHTML = allCard + cards;
-}
-
 function renderTopNav() {
   const navInner = document.getElementById('catNavInner');
   if (!navInner) return;
@@ -95,7 +82,7 @@ function renderCategoryProducts() {
   grid.innerHTML = PRODUCTS.map(p => `
     <div class="p-card" ${p.stock > 0 ? `data-product-id="${p.id}" data-event-type="view"` : ''}>
       ${p.deal ? '<div class="tag sale">DEAL</div>' : (p.tag ? `<div class="tag ${p.tag === 'Sale' ? 'sale' : ''}">${escapeHtml(p.tag)}</div>` : (p.has_sale_price ? '<div class="tag sale">SALE</div>' : ''))}
-      <div class="img-wrap"><img src="${escapeHtml(p.image || '')}" alt="${escapeHtml(p.name)}"></div>
+      <div class="img-wrap"><img src="${escapeHtml(p.image || '')}" alt="${escapeHtml(p.name)}"${categoryProductImageErrorHandler(p.category)}></div>
       <div class="body">
         <div class="cat-lbl">${escapeHtml(p.category)}</div>
         <div class="p-title">${escapeHtml(p.name)}</div>
@@ -180,7 +167,7 @@ async function renderCart() {
   document.getElementById('cartFoot').style.display = 'block';
   wrap.innerHTML = lines.map(l => `
     <div class="cart-item">
-      <img src="${l.p.image}" alt="">
+      <img src="${l.p.image}" alt=""${categoryProductImageErrorHandler(l.p.category)}>
       <div class="info">
         <div class="t">${l.p.name}</div>
         <div class="p">${fmt(l.p.effective_price || l.p.price)}</div>

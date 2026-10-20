@@ -1,7 +1,8 @@
 # app/__init__.py
 
 import os
-from flask import Flask, g, request, send_from_directory
+from flask import Flask, g, jsonify, request, send_from_directory
+from werkzeug.exceptions import RequestEntityTooLarge
 
 from app.db import get_connection, init_schema, migrate_order_status_schema, query_one, execute
 from app.auth import hash_password
@@ -13,6 +14,21 @@ PUBLIC_DIR = os.path.join(BASE_DIR, 'public')
 
 def create_app():
     app = Flask(__name__, static_folder=None)
+    app.config['PRODUCT_IMAGE_UPLOAD_DIR'] = os.environ.get(
+        'PRODUCT_IMAGE_UPLOAD_DIR',
+        os.path.join(BASE_DIR, 'data', 'product_images'),
+    )
+
+    @app.before_request
+    def limit_product_image_request():
+        is_product_create = request.path == '/api/products' and request.method == 'POST'
+        is_product_update = request.path.startswith('/api/products/') and request.method == 'PUT'
+        if (is_product_create or is_product_update) and request.mimetype == 'multipart/form-data':
+            request.max_content_length = 128 * 1024
+
+    @app.errorhandler(RequestEntityTooLarge)
+    def handle_request_too_large(_error):
+        return jsonify(error='The upload request is too large. Image files must be smaller than 50 KB.'), 413
 
     # ---- No localhost/port restriction -----------------------------------
     # The frontend is served BY this same Flask app (see the catch-all route
@@ -102,6 +118,13 @@ def create_app():
         # impossible for an old cached file to silently keep being used after
         # an update.
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        return response
+
+    @app.get('/uploads/product-images/<path:filename>')
+    def serve_product_image(filename):
+        response = send_from_directory(app.config['PRODUCT_IMAGE_UPLOAD_DIR'], filename)
+        response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
         return response
 
     # ---- First-run setup: create tables + seed data -------------------------

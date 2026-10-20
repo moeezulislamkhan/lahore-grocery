@@ -6,13 +6,15 @@ const API = {
   setUser(u) { if (u) localStorage.setItem('sg_user', JSON.stringify(u)); else localStorage.removeItem('sg_user'); },
 
   async request(method, path, body) {
-    const headers = { 'Content-Type': 'application/json' };
+    const isFormData = body instanceof FormData;
+    const headers = {};
+    if (!isFormData) headers['Content-Type'] = 'application/json';
     const token = this.token();
     if (token) headers['Authorization'] = `Bearer ${token}`;
     const res = await fetch(path, {
       method,
       headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body !== undefined ? (isFormData ? body : JSON.stringify(body)) : undefined,
     });
     let data = {};
     try { data = await res.json(); } catch { /* no body */ }

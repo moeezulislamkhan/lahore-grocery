@@ -52,6 +52,7 @@ function logout() {
 }
 
 function enterDashboard(user) {
+  initializeImageUploadValidation();
   const info = ROLE_INFO[user.role];
   // The Deals markup is kept in one place and moved into the dashboard content
   // area at runtime so it works with the existing sidebar layout on all sizes.
@@ -94,6 +95,10 @@ function enterDashboard(user) {
 function showAdminPage(page) {
   try {
     const currentUser = API.user();
+    if (page !== 'products') {
+      resetAddProductForm();
+      document.getElementById('addProductPanel').style.display = 'none';
+    }
     const link = document.querySelector(`#adminNav a[data-page="${page}"]`);
     const req = link ? link.dataset.req : null;
     const allowed = !req || (currentUser && req.split(',').includes(currentUser.role));
@@ -249,7 +254,7 @@ function renderAdminProducts(filter = '') {
     const status = p.stock === 0 ? '<span class="pill out">Out of stock</span>' : p.stock < 15 ? '<span class="pill low">Low stock</span>' : '<span class="pill instock">In stock</span>';
     const unitSuffix = p.unit ? '/' + escapeHtml(p.unit.trim().replace(/^\/+/, '')) : '';
     return `<tr>
-      <td><img src="${escapeHtml(p.image || '')}"></td>
+      <td><img src="${escapeHtml(p.image || '')}"${categoryProductImageErrorHandler(p.category)}></td>
       <td>${escapeHtml(p.name)}</td>
       <td>${escapeHtml(p.category)}</td>
       <td>${p.sale_price && p.sale_price < p.price ? `<span class="old">${fmt(p.price)}</span>${fmt(p.sale_price)}` : fmt(p.price)}${unitSuffix}</td>
@@ -262,6 +267,76 @@ function renderAdminProducts(filter = '') {
 function filterAdminProducts(v) { renderAdminProducts(v); }
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+}
+const IMAGE_UPLOAD_MAX_BYTES = 50 * 1024;
+const IMAGE_UPLOAD_CONTROLS = {
+  npImageFile: { feedbackId: 'npImageFileFeedback', saveId: 'npSaveProduct', help: 'PNG, JPG, or WebP; smaller than 50 KB.' },
+  epImageFile: { feedbackId: 'epImageFileFeedback', saveId: 'epSaveProduct', help: 'PNG, JPG, or WebP; smaller than 50 KB. Leave empty to keep the current image.' },
+  collectionNewProductImageFile: { feedbackId: 'collectionNewProductImageFileFeedback', saveId: 'collectionSaveProduct', help: 'PNG, JPG, or WebP; smaller than 50 KB.' },
+};
+function validateProductImage(input) {
+  const control = IMAGE_UPLOAD_CONTROLS[input.id];
+  const field = input.closest('.image-upload-field');
+  const feedback = document.getElementById(control.feedbackId);
+  const clearButton = field.querySelector('[data-clear-image]');
+  const file = input.files[0];
+  field.classList.remove('image-upload-valid', 'image-upload-invalid');
+  clearButton.hidden = !file;
+  if (!file) {
+    input.dataset.imageValid = '';
+    feedback.textContent = control.help;
+    document.getElementById(control.saveId).disabled = false;
+    return;
+  }
+
+  const allowedTypes = ['image/png', 'image/jpeg', 'image/webp'];
+  const allowedExtensions = /\.(png|jpe?g|webp)$/i;
+  let error = '';
+  if (file.size >= IMAGE_UPLOAD_MAX_BYTES) {
+    error = 'Image must be smaller than 50 KB.';
+  } else if ((file.type && !allowedTypes.includes(file.type)) || (!allowedTypes.includes(file.type) && !allowedExtensions.test(file.name))) {
+    error = 'Choose a PNG, JPG, JPEG, or WebP image.';
+  }
+  if (error) {
+    field.classList.add('image-upload-invalid');
+    feedback.textContent = `✖ ${error}`;
+    input.dataset.imageValid = 'false';
+    document.getElementById(control.saveId).disabled = true;
+    return;
+  }
+  field.classList.add('image-upload-valid');
+  feedback.textContent = '✓ Image is valid. File size is less than 50 KB.';
+  input.dataset.imageValid = 'true';
+  document.getElementById(control.saveId).disabled = false;
+}
+function initializeImageUploadValidation() {
+  Object.keys(IMAGE_UPLOAD_CONTROLS).forEach(inputId => {
+    const input = document.getElementById(inputId);
+    if (input.dataset.validationInitialized) return;
+    input.dataset.validationInitialized = 'true';
+    input.addEventListener('change', () => validateProductImage(input));
+    document.querySelector(`[data-clear-image="${inputId}"]`).addEventListener('click', () => {
+      input.value = '';
+      validateProductImage(input);
+    });
+  });
+}
+function selectedProductImage(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input.files[0]) return null;
+  if (input.dataset.imageValid !== 'true') {
+    validateProductImage(input);
+    return false;
+  }
+  return input.files[0];
+}
+function productFormData(fields, imageUrl, file) {
+  const formData = new FormData();
+  Object.entries({ ...fields, image: imageUrl }).forEach(([key, value]) => {
+    formData.append(key, value == null ? '' : String(value));
+  });
+  if (file) formData.append('image_file', file, file.name);
+  return formData;
 }
 
 /* ============ COLLECTIONS ============ */
@@ -308,7 +383,9 @@ async function createCollectionProduct() {
   const salePrice = salePriceValue ? Number(salePriceValue) : null;
   const tag = document.getElementById('collectionNewProductTag').value.trim() || 'Pink Salt';
   const stock = Number.parseInt(document.getElementById('collectionNewProductStock').value, 10) || 0;
-  const image = document.getElementById('collectionNewProductImage').value.trim() || 'https://images.unsplash.com/photo-1610348725531-843dff563e2c?w=300&q=80';
+  const image = document.getElementById('collectionNewProductImage').value.trim();
+  const imageFile = selectedProductImage('collectionNewProductImageFile');
+  if (imageFile === false) return;
   if (!name || !Number.isFinite(price) || price <= 0) {
     showToast('Enter a product name and a valid price.');
     return;
@@ -318,19 +395,21 @@ async function createCollectionProduct() {
     return;
   }
   try {
-    const { product } = await API.post('/api/products', {
+    const formData = productFormData({
       name,
       category: 'Pink Salt',
       price,
       salePrice,
       tag,
       stock,
-      image,
-    });
+    }, image, imageFile);
+    const { product } = await API.post('/api/products', formData);
     await setCollectionProduct(product.id, true);
     ['collectionNewProductName', 'collectionNewProductPrice', 'collectionNewProductSalePrice', 'collectionNewProductTag', 'collectionNewProductImage'].forEach(id => {
       document.getElementById(id).value = '';
     });
+    document.getElementById('collectionNewProductImageFile').value = '';
+    validateProductImage(document.getElementById('collectionNewProductImageFile'));
     document.getElementById('collectionNewProductStock').value = '0';
     await loadProducts();
   } catch (error) { showToast(error.message); }
@@ -473,8 +552,22 @@ async function deleteDeal(dealId) {
   if (!await confirmAction('Remove this deal? The original product will remain.', 'Remove deal')) return;
   try { await API.delete(`/api/admin/deals/${dealId}`); showToast('Deal removed.'); loadDeals(); } catch (err) { showToast(err.message); }
 }
-function openAddProduct() { document.getElementById('addProductPanel').style.display = 'block'; document.getElementById('addProductPanel').scrollIntoView({ behavior: 'smooth' }); }
-function closeAddProduct() { document.getElementById('addProductPanel').style.display = 'none'; }
+function resetAddProductForm() {
+  ['npName', 'npUnit', 'npPrice', 'npSalePrice', 'npTag', 'npStock', 'npImg', 'npImageFile'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('npCat').selectedIndex = 0;
+  validateProductImage(document.getElementById('npImageFile'));
+}
+function openAddProduct() {
+  resetAddProductForm();
+  document.getElementById('addProductPanel').style.display = 'block';
+  document.getElementById('addProductPanel').scrollIntoView({ behavior: 'smooth' });
+}
+function closeAddProduct() {
+  resetAddProductForm();
+  document.getElementById('addProductPanel').style.display = 'none';
+}
 
 async function addProduct() {
   const name = document.getElementById('npName').value.trim();
@@ -485,13 +578,14 @@ async function addProduct() {
   const salePrice = salePriceValue ? parseFloat(salePriceValue) : null;
   const tag = document.getElementById('npTag').value.trim();
   const stock = parseInt(document.getElementById('npStock').value) || 0;
-  const image = document.getElementById('npImg').value.trim() || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&q=80';
+  const image = document.getElementById('npImg').value.trim();
+  const imageFile = selectedProductImage('npImageFile');
+  if (imageFile === false) return;
   if (!name || !price) { showToast('Please enter at least a product name and price.'); return; }
   try {
-    await API.post('/api/products', { name, unit, category, price, salePrice, tag, stock, image });
+    await API.post('/api/products', productFormData({ name, unit, category, price, salePrice, tag, stock }, image, imageFile));
     showToast('Product added.');
     closeAddProduct();
-    document.getElementById('npName').value = ''; document.getElementById('npUnit').value = ''; document.getElementById('npPrice').value = ''; document.getElementById('npSalePrice').value = ''; document.getElementById('npTag').value = ''; document.getElementById('npStock').value = ''; document.getElementById('npImg').value = '';
     loadProducts();
   } catch (err) { showToast(err.message); }
 }
@@ -526,7 +620,7 @@ async function loadOrders() {
         <td><button class="link-btn" onclick="openOrderDetail(${o.id})">${o.order_code}</button></td>
         <td>${o.customer_name}</td>
         <td>${o.phone || 'Not Provided'}</td>
-        <td>${Array.isArray(o.items_count) ? o.items_count : (o.items_count || 0)}</td>
+        <td>${Number(o.items_count || 0)}</td>
         <td>${fmt(o.total)}</td>
         <td>${o.payment_method}</td>
         <td>${renderStatusPill(o.payment_status)}</td>
@@ -542,7 +636,7 @@ async function loadOrders() {
     document.getElementById('ordersTable').innerHTML = header + '<tbody>' + (rowsHtml || '<tr><td colspan="9" class="empty-note">No orders yet.</td></tr>') + '</tbody>';
     document.getElementById('recentOrdersTable').innerHTML = header + '<tbody>' + (orders.slice(0, 5).map(o => `
       <tr>
-        <td><button class="link-btn" onclick="openOrderDetail(${o.id})">${o.order_code}</button></td><td>${o.customer_name}</td><td>${o.phone || 'Not Provided'}</td><td>${o.items_count || 0}</td><td>${fmt(o.total)}</td><td>${o.payment_method}</td><td>${renderStatusPill(o.payment_status)}</td><td>${renderStatusPill(o.order_status, 'pill')}</td><td class="row-actions"><button onclick="openOrderDetail(${o.id})">View</button></td>
+        <td><button class="link-btn" onclick="openOrderDetail(${o.id})">${o.order_code}</button></td><td>${o.customer_name}</td><td>${o.phone || 'Not Provided'}</td><td>${Number(o.items_count || 0)}</td><td>${fmt(o.total)}</td><td>${o.payment_method}</td><td>${renderStatusPill(o.payment_status)}</td><td>${renderStatusPill(o.order_status, 'pill')}</td><td class="row-actions"><button onclick="openOrderDetail(${o.id})">View</button></td>
       </tr>`).join('') || '<tr><td colspan="9" class="empty-note">No orders yet.</td></tr>') + '</tbody>';
   } catch (err) { showToast(err.message); }
 }
@@ -919,6 +1013,8 @@ function openEditProduct(productId) {
   document.getElementById('epTag').value = product.tag || '';
   document.getElementById('epStock').value = product.stock;
   document.getElementById('epImg').value = product.image || '';
+  document.getElementById('epImageFile').value = '';
+  validateProductImage(document.getElementById('epImageFile'));
   document.getElementById('editProductPanel').style.display = 'block';
   document.getElementById('editProductPanel').scrollIntoView({ behavior: 'smooth' });
 }
@@ -936,10 +1032,12 @@ async function saveEditProduct() {
   const salePrice = salePriceValue ? parseFloat(salePriceValue) : null;
   const tag = document.getElementById('epTag').value.trim();
   const stock = parseInt(document.getElementById('epStock').value) || 0;
-  const image = document.getElementById('epImg').value.trim() || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&q=80';
+  const image = document.getElementById('epImg').value.trim();
+  const imageFile = selectedProductImage('epImageFile');
+  if (imageFile === false) return;
   if (!name || !price) { showToast('Please enter at least a product name and price.'); return; }
   try {
-    await API.put(`/api/products/${CURRENT_EDIT_PRODUCT_ID}`, { name, unit, category, price, salePrice, tag, stock, image });
+    await API.put(`/api/products/${CURRENT_EDIT_PRODUCT_ID}`, productFormData({ name, unit, category, price, salePrice, tag, stock }, image, imageFile));
     showToast('Product updated.');
     closeEditProduct();
     loadProducts();

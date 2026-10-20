@@ -40,6 +40,85 @@ async function cancelOrder(orderId) {
   }
 }
 
+async function showOrderDetails(orderCode) {
+  try {
+    const payload = await API.get(`/api/orders/${encodeURIComponent(orderCode)}`);
+    const order = payload.order || {};
+    const items = payload.items || [];
+    const itemRows = items.map(item => {
+      const price = Number(item.unit_price || 0);
+      const quantity = Number(item.qty || 0);
+      const name = item.product_name || item.product_name_snapshot || 'Product';
+      const image = item.product_image_snapshot || item.product_image || '';
+      return `
+        <tr>
+          <td><img src="${escapeHtml(image || 'assets/trolley.png')}" alt="${escapeHtml(name)}"></td>
+          <td><strong>${escapeHtml(name)}</strong>${item.variant_snapshot ? `<br><span>${escapeHtml(item.variant_snapshot)}</span>` : ''}</td>
+          <td>${quantity}</td>
+          <td>${fmt(price)}</td>
+          <td>${fmt(Number(item.line_total || price * quantity))}</td>
+        </tr>`;
+    }).join('') || '<tr><td colspan="5" class="empty-note">No products were recorded for this order.</td></tr>';
+    const status = value => {
+      const label = String(value || 'Not provided').replace(/_/g, ' ');
+      const className = String(value || '').replace(/[^a-z0-9_-]/gi, '');
+      return `<span class="status-badge ${className}">${escapeHtml(label)}</span>`;
+    };
+    const detailField = (label, value) => `<div class="field"><label>${label}</label><span>${escapeHtml(value || 'Not provided')}</span></div>`;
+
+    document.getElementById('userOrderDetailTitle').textContent = `Order ${order.order_code || ''}`;
+    document.getElementById('userOrderDetailContent').innerHTML = `
+      <div class="order-section">
+        <h3>Order Overview</h3>
+        <div class="order-grid">
+          ${detailField('Order Date', order.created_at ? new Date(order.created_at).toLocaleString() : 'Not provided')}
+          <div class="field"><label>Order Status</label><span>${status(order.order_status)}</span></div>
+          <div class="field"><label>Payment Status</label><span>${status(order.payment_status)}</span></div>
+          ${detailField('Payment Method', order.payment_method_display || order.payment_method)}
+        </div>
+      </div>
+      <div class="order-section">
+        <h3>Delivery Details</h3>
+        <div class="order-grid">
+          ${detailField('Name', order.customer_name)}
+          ${detailField('Phone', order.customer_phone || order.phone)}
+          ${detailField('Address', order.delivery_address || order.address)}
+          ${detailField('City', order.city)}
+          ${detailField('Postal Code', order.postal_code)}
+          ${detailField('Delivery Instructions', order.delivery_instructions)}
+        </div>
+      </div>
+      <div class="order-section">
+        <h3>Items</h3>
+        <table class="order-items-table">
+          <thead><tr><th>Image</th><th>Product</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
+          <tbody>${itemRows}</tbody>
+        </table>
+      </div>
+      <div class="order-section">
+        <h3>Payment Summary</h3>
+        <div class="order-summary-box">
+          <div class="line"><span>Subtotal</span><strong>${fmt(Number(order.subtotal || 0))}</strong></div>
+          <div class="line"><span>Delivery Charges</span><strong>${fmt(Number(order.delivery_fee || 0))}</strong></div>
+          <div class="line"><span>Discount</span><strong>${fmt(Number(order.discount || 0))}</strong></div>
+          <div class="line total"><span>Grand Total</span><strong>${fmt(Number(order.total || 0))}</strong></div>
+        </div>
+      </div>`;
+
+    const modal = document.getElementById('userOrderDetailModal');
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+  } catch (err) {
+    showUserToast(err.message || 'Could not load order details.');
+  }
+}
+
+function closeUserOrderDetail() {
+  const modal = document.getElementById('userOrderDetailModal');
+  modal.classList.remove('open');
+  modal.setAttribute('aria-hidden', 'true');
+}
+
 function showUserPage(page) {
   document.querySelectorAll('.admin-page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('#userNav a').forEach(a => a.classList.remove('active'));
@@ -102,7 +181,7 @@ async function loadAccount() {
     document.getElementById('kpiTotalSpent').textContent = fmt(totalSpent);
     document.getElementById('kpiLastOrder').textContent = orders.length ? orders[0].order_code : 'No orders yet';
 
-    const header = `<thead><tr><th>Order</th><th>Date</th><th>Total</th><th>Payment</th><th>Status</th><th>Action</th></tr></thead>`;
+    const header = `<thead><tr><th>Order</th><th>Date</th><th>Total</th><th>Payment</th><th>Status</th><th>Details</th><th>Action</th></tr></thead>`;
     const canAttemptCancellation = order => !['delivered', 'returned', 'cancelled'].includes(order.order_status);
     const rowHtml = (o) => `
       <tr>
@@ -111,15 +190,22 @@ async function loadAccount() {
         <td>${fmt(o.total)}</td>
         <td>${escapeHtml(o.payment_method)}</td>
         <td><span class="pill ${escapeHtml(o.order_status)}">${escapeHtml(o.order_status.replace(/_/g, ' '))}</span></td>
+        <td class="row-actions"><button type="button" onclick="showOrderDetails(this.dataset.orderCode)" data-order-code="${escapeHtml(o.order_code)}">Details</button></td>
         <td class="row-actions">${canAttemptCancellation(o) ? `<button class="del" onclick="cancelOrder(${o.id})">Cancel order</button>` : '—'}</td>
       </tr>`;
-    const rows = orders.map(rowHtml).join('') || '<tr><td colspan="6" class="empty-note">No orders yet — go find something fresh!</td></tr>';
+    const rows = orders.map(rowHtml).join('') || '<tr><td colspan="7" class="empty-note">No orders yet — go find something fresh!</td></tr>';
     document.getElementById('allOrdersTable').innerHTML = header + '<tbody>' + rows + '</tbody>';
-    document.getElementById('recentOrdersTable').innerHTML = header + '<tbody>' + (orders.slice(0, 5).map(rowHtml).join('') || '<tr><td colspan="6" class="empty-note">No orders yet.</td></tr>') + '</tbody>';
+    document.getElementById('recentOrdersTable').innerHTML = header + '<tbody>' + (orders.slice(0, 5).map(rowHtml).join('') || '<tr><td colspan="7" class="empty-note">No orders yet.</td></tr>') + '</tbody>';
   } catch (err) {
     document.getElementById('allOrdersTable').innerHTML = `<tr><td class="empty-note">${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
 setupMobilePanelNav();
+document.getElementById('userOrderDetailModal').addEventListener('click', event => {
+  if (event.target.id === 'userOrderDetailModal') closeUserOrderDetail();
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') closeUserOrderDetail();
+});
 loadAccount();

@@ -137,7 +137,10 @@ def list_all_orders():
     user = get_session_user(db, request)
     if not role_allowed(user, ['admin', 'manager', 'staff', 'employee']):
         return jsonify(error='Staff access required.'), 403
-    orders = query_all(db, 'SELECT * FROM orders ORDER BY created_at DESC LIMIT 200')
+    orders = query_all(db, """SELECT o.*,
+        COALESCE((SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = o.id), 0) AS items_count
+        FROM orders o
+        ORDER BY o.created_at DESC LIMIT 200""")
     return jsonify(orders=orders)
 
 

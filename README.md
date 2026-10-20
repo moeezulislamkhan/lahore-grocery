@@ -22,6 +22,25 @@ API and the frontend from the same origin, so use this server rather than a
 separate static-file server. Cross-origin API access is disabled unless the
 request origin matches the explicitly configured `CORS_ALLOWED_ORIGIN`.
 
+### Product image uploads
+
+The Admin Panel accepts optional PNG, JPG/JPEG, and WebP uploads in the
+standard product form, product editor, and Pink Salt product form. Uploaded
+files take precedence over the image URL if both are supplied; without an
+upload, the URL field continues to work as before. Existing images are kept
+when editing unless the URL is changed or a replacement file is selected.
+Each uploaded file must be **smaller than 50 KB (51,200 bytes)** and is
+checked by the backend for both its byte signature and decodable image format.
+
+Images are saved outside the database in `data/product_images/` by default.
+Set `PRODUCT_IMAGE_UPLOAD_DIR` to a persistent, writable directory when
+deploying (for example, a mounted persistent volume); keep that directory
+across application restarts and deployments. Flask limits product multipart
+requests to 128 KiB to allow form fields around the 50 KB image, so any
+reverse proxy or hosting request-body limit must be at least 128 KiB. Other
+application request sizes are unaffected.
+This implementation is designed for small 50 KB images, not large uploads.
+
 ## Admin login
 
 As requested, the seeded admin account is:

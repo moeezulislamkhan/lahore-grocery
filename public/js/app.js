@@ -214,7 +214,8 @@ function productCardHtml(p, eventType = 'view') {
   const disabled = p.stock === 0 ? 'disabled style="opacity:.35;cursor:not-allowed;"' : '';
   const cartSource = eventType.startsWith('recommendation_') ? 'recommendation' : 'catalog';
   const trackingAttributes = p.stock > 0 ? ' data-product-id="' + p.id + '" data-event-type="' + eventType + '"' : '';
-  return '<div class="p-card"' + trackingAttributes + '>' + saleTag + '<div class="img-wrap"><img src="' + escapeHtml(p.image || '') + '" alt="' + escapeHtml(p.name) + '"></div><div class="body"><div class="cat-lbl">' + escapeHtml(p.category) + '</div><div class="p-title">' + escapeHtml(p.name) + '</div><div class="row"><div class="price">' + productPriceHtml(p) + '</div><button class="add-btn" onclick="addToCart(' + p.id + ', \'' + cartSource + '\')" ' + disabled + '>+</button></div></div></div>';
+  const imageFallback = categoryProductImageErrorHandler(p.category);
+  return '<div class="p-card"' + trackingAttributes + '>' + saleTag + '<div class="img-wrap"><img src="' + escapeHtml(p.image || '') + '" alt="' + escapeHtml(p.name) + '"' + imageFallback + '></div><div class="body"><div class="cat-lbl">' + escapeHtml(p.category) + '</div><div class="p-title">' + escapeHtml(p.name) + '</div><div class="row"><div class="price">' + productPriceHtml(p) + '</div><button class="add-btn" onclick="addToCart(' + p.id + ', \'' + cartSource + '\')" ' + disabled + '>+</button></div></div></div>';
 }
 
 function renderProducts(showAll = false, eventType = 'recommendation_view') {
@@ -287,7 +288,7 @@ function renderCart() {
   document.getElementById('cartFoot').style.display = 'block';
   wrap.innerHTML = lines.map(l => `
     <div class="cart-item">
-      <img src="${l.p.image}" alt="">
+      <img src="${l.p.image}" alt=""${categoryProductImageErrorHandler(l.p.category)}>
       <div class="info">
         <div class="t">${l.p.name}</div>
         <div class="p">${fmt(l.p.effective_price || l.p.price)}</div>

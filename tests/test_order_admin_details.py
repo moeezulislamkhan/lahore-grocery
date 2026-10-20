@@ -44,6 +44,11 @@ def test_admin_order_detail_and_payment_status_endpoints():
     client = app.test_client()
     admin = _login_admin(client)
 
+    orders_response = client.get('/api/orders', headers={'Authorization': f"Bearer {admin['token']}"})
+    assert orders_response.status_code == 200, orders_response.get_data(as_text=True)
+    listed_order = next(order for order in orders_response.get_json()['orders'] if order['id'] == order_id)
+    assert listed_order['items_count'] == 1
+
     detail_response = client.get(f'/api/orders/{order_id}/detail', headers={'Authorization': f"Bearer {admin['token']}"})
     assert detail_response.status_code == 200, detail_response.get_data(as_text=True)
     payload = detail_response.get_json()

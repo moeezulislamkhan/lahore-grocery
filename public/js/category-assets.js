@@ -10,6 +10,20 @@ const CATEGORY_IMAGES = {
 };
 
 const CATEGORY_FALLBACK_ICONS = { 'Meat & Poultry': '🍗' };
+function categoryProductImageErrorHandler(category) {
+  const fallback = CATEGORY_IMAGES[category];
+  return fallback ? ` onerror="this.onerror=null;this.src='${fallback}'"` : '';
+}
+
+function setCategoryProductImageFallback(image, category) {
+  const fallback = CATEGORY_IMAGES[category];
+  if (fallback) {
+    image.addEventListener('error', () => {
+      image.src = fallback;
+    }, { once: true });
+  }
+}
+
 const CATEGORY_CARD_CLASSES = {
   'All Products': ' cat-card--all-products',
   'Bakery': ' cat-card--bakery',

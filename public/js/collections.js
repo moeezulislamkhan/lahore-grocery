@@ -31,6 +31,7 @@ function renderFeaturedCollectionProducts() {
     const image = document.createElement('img');
     image.src = product.image || '';
     image.alt = product.name;
+    setCategoryProductImageFallback(image, product.category);
     const name = document.createElement('div');
     name.className = 'p-name';
     name.textContent = product.name;
