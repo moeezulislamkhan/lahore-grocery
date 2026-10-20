@@ -100,6 +100,8 @@ if (sessionStorage.getItem(INTRO_SEEN_KEY)) {
 /* ============ PRODUCT CATALOG (from API) ============ */
 let PRODUCTS = [];
 let ALL_PRODUCTS = [];
+let RECOMMENDED_PRODUCTS = null;
+let RECOMMENDATIONS_PERSONALIZED = false;
 let searchRequestId = 0;
 function fmt(n) { return 'Rs. ' + Math.round(n).toLocaleString(); }
 
@@ -118,8 +120,28 @@ async function loadProducts() {
     // immediately instead of the cart badge silently reading as empty.
     renderCart();
     loadCampaignBanner();
+    loadPersonalizedProducts();
   } catch (err) {
     document.getElementById('productGrid').innerHTML = `<p class="empty-note">Could not load products. Is the server running?</p>`;
+  }
+}
+
+async function loadPersonalizedProducts() {
+  const requestId = searchRequestId;
+  const grid = document.getElementById('productGrid');
+  const title = document.getElementById('productRecommendationTitle');
+  if (!grid || !title) return;
+  try {
+    const result = await API.get('/api/recommendations?limit=8');
+    RECOMMENDED_PRODUCTS = result.products;
+    RECOMMENDATIONS_PERSONALIZED = result.personalized;
+    if (requestId !== searchRequestId || !result.products.length) return;
+    PRODUCTS = [...ALL_PRODUCTS];
+    title.textContent = RECOMMENDATIONS_PERSONALIZED ? 'Picked for you' : 'Popular this week';
+    grid.innerHTML = result.products.map(product => productCardHtml(product, 'recommendation_view')).join('');
+    window.observeProductImpressions(grid);
+  } catch (error) {
+    console.warn('[personalization] Recommendations could not be loaded; keeping the catalog fallback.', error);
   }
 }
 
@@ -131,6 +153,14 @@ async function searchProducts(value) {
   if (!query) {
     PRODUCTS = ALL_PRODUCTS;
     renderCategories();
+    if (RECOMMENDED_PRODUCTS && RECOMMENDED_PRODUCTS.length) {
+      const title = document.getElementById('productRecommendationTitle');
+      if (title) title.textContent = RECOMMENDATIONS_PERSONALIZED ? 'Picked for you' : 'Popular this week';
+      const recommendedGrid = document.getElementById('productGrid');
+      recommendedGrid.innerHTML = RECOMMENDED_PRODUCTS.map(product => productCardHtml(product, 'recommendation_view')).join('');
+      window.observeProductImpressions(recommendedGrid);
+      return;
+    }
     renderProducts();
     return;
   }
@@ -140,7 +170,7 @@ async function searchProducts(value) {
     if (requestId !== searchRequestId) return;
     PRODUCTS = products;
     renderCategories();
-    renderProducts(true);
+    renderProducts(true, 'view');
   } catch (err) {
     if (requestId !== searchRequestId) return;
     grid.innerHTML = '<p class="empty-note">Search is temporarily unavailable.</p>';
@@ -179,20 +209,24 @@ function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 }
 
-function productCardHtml(p) {
+function productCardHtml(p, eventType = 'view') {
   const saleTag = p.deal ? '<div class="tag sale">DEAL</div>' : (p.tag ? '<div class="tag' + (p.tag === 'Sale' ? ' sale' : '') + '">' + escapeHtml(p.tag) + '</div>' : (p.has_sale_price ? '<div class="tag sale">SALE</div>' : ''));
   const disabled = p.stock === 0 ? 'disabled style="opacity:.35;cursor:not-allowed;"' : '';
-  return '<div class="p-card">' + saleTag + '<div class="img-wrap"><img src="' + escapeHtml(p.image || '') + '" alt="' + escapeHtml(p.name) + '"></div><div class="body"><div class="cat-lbl">' + escapeHtml(p.category) + '</div><div class="p-title">' + escapeHtml(p.name) + '</div><div class="row"><div class="price">' + productPriceHtml(p) + '</div><button class="add-btn" onclick="addToCart(' + p.id + ')" ' + disabled + '>+</button></div></div></div>';
+  const cartSource = eventType.startsWith('recommendation_') ? 'recommendation' : 'catalog';
+  const trackingAttributes = p.stock > 0 ? ' data-product-id="' + p.id + '" data-event-type="' + eventType + '"' : '';
+  return '<div class="p-card"' + trackingAttributes + '>' + saleTag + '<div class="img-wrap"><img src="' + escapeHtml(p.image || '') + '" alt="' + escapeHtml(p.name) + '"></div><div class="body"><div class="cat-lbl">' + escapeHtml(p.category) + '</div><div class="p-title">' + escapeHtml(p.name) + '</div><div class="row"><div class="price">' + productPriceHtml(p) + '</div><button class="add-btn" onclick="addToCart(' + p.id + ', \'' + cartSource + '\')" ' + disabled + '>+</button></div></div></div>';
 }
 
-function renderProducts(showAll = false) {
+function renderProducts(showAll = false, eventType = 'recommendation_view') {
   const grid = document.getElementById('productGrid');
   const products = showAll ? PRODUCTS : PRODUCTS.slice(0, 8);
   if (products.length === 0) {
     grid.innerHTML = '<p class="empty-note">No results found.</p>';
     return;
   }
-  grid.innerHTML = products.map(productCardHtml).join('');
+  const cardEventType = eventType === 'view' ? 'view' : 'recommendation_view';
+  grid.innerHTML = products.map(product => productCardHtml(product, cardEventType)).join('');
+  window.observeProductImpressions(grid);
 }
 
 const productSearchInput = document.getElementById('productSearchInput');
@@ -218,8 +252,9 @@ async function loadCampaignBanner() {
 let CART = JSON.parse(localStorage.getItem('sg_cart') || '{}');
 function saveCart() { localStorage.setItem('sg_cart', JSON.stringify(CART)); }
 
-function addToCart(id) {
+function addToCart(id, source = 'catalog') {
   CART[id] = (CART[id] || 0) + 1;
+  window.trackProductInteraction(id, source === 'recommendation' ? 'recommendation_add' : 'cart_add');
   saveCart(); renderCart(); toggleCart(true);
 }
 function changeQty(id, delta) {

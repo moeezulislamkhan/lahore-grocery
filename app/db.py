@@ -250,6 +250,16 @@ SCHEMA_SQLITE = [
         discount REAL DEFAULT 0,
         line_total REAL DEFAULT 0
     )""",
+    """CREATE TABLE IF NOT EXISTS user_product_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+        event_type TEXT NOT NULL CHECK(event_type IN ('view','cart_add','recommendation_view','recommendation_add')),
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )""",
+    'CREATE INDEX IF NOT EXISTS idx_user_product_events_user_time ON user_product_events (user_id, created_at)',
+    'CREATE INDEX IF NOT EXISTS idx_user_product_events_product_time ON user_product_events (product_id, created_at)',
+    'CREATE INDEX IF NOT EXISTS idx_user_product_events_created_at ON user_product_events (created_at)',
     """CREATE TABLE IF NOT EXISTS support_messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         form_id TEXT UNIQUE,
@@ -401,6 +411,19 @@ SCHEMA_MYSQL = [
         discount DECIMAL(10,2) DEFAULT 0,
         line_total DECIMAL(10,2) DEFAULT 0,
         FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
+    """CREATE TABLE IF NOT EXISTS user_product_events (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        user_id INT NOT NULL,
+        product_id INT NOT NULL,
+        event_type VARCHAR(32) NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CHECK(event_type IN ('view','cart_add','recommendation_view','recommendation_add')),
+        KEY idx_user_product_events_user_time (user_id, created_at),
+        KEY idx_user_product_events_product_time (product_id, created_at),
+        KEY idx_user_product_events_created_at (created_at),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
     """CREATE TABLE IF NOT EXISTS support_messages (
         id INT PRIMARY KEY AUTO_INCREMENT,

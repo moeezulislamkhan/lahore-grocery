@@ -178,6 +178,7 @@ let overviewChart = null;
 async function loadOverview() {
   try {
     const s = await API.get('/api/analytics/summary');
+    loadRecommendationMetrics();
     const cards = document.querySelectorAll('#kpiGrid .kpi-card .val');
     cards[0].textContent = fmt(s.revenue);
     cards[1].textContent = s.orderCount;
@@ -207,6 +208,28 @@ async function loadOverview() {
   } catch (err) {
     // KPI cards hidden from staff role — expected 403, show placeholders instead
     document.querySelectorAll('#kpiGrid .kpi-card .val').forEach(el => el.textContent = '—');
+  }
+}
+
+async function loadRecommendationMetrics() {
+  const metrics = document.getElementById('recommendationMetrics');
+  const topProducts = document.getElementById('recommendationTopProducts');
+  if (!metrics || !topProducts) return;
+  try {
+    const data = await API.get('/api/analytics/recommendations');
+    metrics.innerHTML = [
+      ['Recommendation impressions', data.recommendationImpressions],
+      ['Adds from recommendations', data.recommendationAdds],
+      ['Recommendation add rate', `${Number(data.recommendationAddRate).toFixed(1)}%`],
+      ['Engaged customers', data.engagedCustomers],
+    ].map(([label, value]) => `<div class="kpi-card"><div class="lbl">${label}</div><div class="val">${Number(value).toLocaleString()}</div></div>`).join('');
+    topProducts.innerHTML = data.topViewedProducts.length
+      ? `<strong>Most viewed recommendations</strong><div class="recommendation-top-products">${data.topViewedProducts.map(product => `<div class="top-prod-row"><div class="name">${escapeHtml(product.name)}</div><div class="amt">${Number(product.recommendation_views).toLocaleString()} views</div></div>`).join('')}</div>`
+      : 'No recommendation impressions yet.';
+  } catch (error) {
+    metrics.innerHTML = '<p class="empty-note">Interaction metrics are temporarily unavailable.</p>';
+    topProducts.textContent = '';
+    console.error('[admin] Recommendation analytics could not be loaded.', error);
   }
 }
 
@@ -925,28 +948,32 @@ async function saveEditProduct() {
 
 /* ============ SETTINGS ============ */
 async function loadSettings() {
+  document.getElementById('setTheme').value = localStorage.getItem('sg_theme') || sessionStorage.getItem('sg_theme') || 'maroon';
   try {
     const { settings } = await API.get('/api/settings');
     if (settings) {
       document.getElementById('setPhone').value = settings.support_phone || '+92 300 1234567';
       document.getElementById('setEmail').value = settings.support_email || 'orders@shakarganj.pk';
     }
-    document.getElementById('setTheme').value = sessionStorage.getItem('sg_theme') || 'maroon';
   } catch (err) {
     // If no settings exist yet, that's fine — use defaults
   }
 }
 async function saveSettings() {
+  const selectedTheme = document.getElementById('setTheme').value;
+  localStorage.setItem('sg_theme', selectedTheme);
+  sessionStorage.removeItem('sg_theme');
+  applyTemporaryTheme(selectedTheme);
   try {
     const settingsData = {
       support_phone: document.getElementById('setPhone').value || '+92 300 1234567',
       support_email: document.getElementById('setEmail').value.trim() || 'orders@shakarganj.pk'
     };
     await API.put('/api/settings', settingsData);
-    sessionStorage.setItem('sg_theme', document.getElementById('setTheme').value);
-    applyTemporaryTheme(document.getElementById('setTheme').value);
     showToast('Settings saved successfully.');
-  } catch (err) { showToast(err.message); }
+  } catch (err) {
+    showToast(`Theme applied, but contact settings could not be saved: ${err.message}`);
+  }
 }
 
 /* ============ MEMBERS/EMPLOYEES ============ */

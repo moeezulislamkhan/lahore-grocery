@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Shakarganj Grocery — Fresh at Your Doorstep</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,900&family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=4">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,900&family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css?v=10">
 </head>
 <body>
 
@@ -18,21 +18,30 @@
   <div class="trolley-stage">
     <div class="splash-store-scene">
       <div class="splash-copy">
-        <div class="splash-brand"><img src="assets/trolley.png" alt=""><span>Shakarganj Grocery</span></div>
-        <div class="eyebrow">Fresh &middot; Fast &middot; Trusted</div>
-        <h1>Your Everyday<br><em>Grocery Store</em></h1>
-        <p>Fresh groceries, quality products and premium Pink Salt — all in one place.</p>
+        <div class="splash-brand"><img src="assets/trolley.png" alt=""><span>Shakarganj Grocery</span><span class="splash-location">LAHORE Only</span></div>
+        <div class="splash-headline"><span>Your daily needs</span><strong>inside one platform</strong></div>
+        <p>Fresh produce, pantry essentials, household care and premium Pink Salt — everything you need, delivered to your door.</p>
         <div class="splash-actions">
           <button class="btn" onclick="enterStorefront()">Shop Now</button>
           <button class="btn line" onclick="location.href='login.html?tab=register'">Get Started</button>
         </div>
-        <a class="splash-signin" href="login.html?tab=login">Already have an account? Sign in</a>
       </div>
-      <div class="splash-product">
-        <span>Premium Pink Salt</span>
-        <img src="assets/grocery_category_assets/pink-salt.png" alt="Premium Pink Himalayan Salt">
+      <div class="splash-products" aria-label="Shop our grocery range">
+        <div class="splash-tile splash-tile-produce"><img src="assets/grocery_category_assets/fruits-vegetables.png" alt="Fresh fruits and vegetables"><span>Fresh produce</span></div>
+        <div class="splash-tile"><img src="assets/grocery_category_assets/bakery.png" alt="Fresh bakery products"><span>Bakery</span></div>
+        <div class="splash-tile"><img src="assets/grocery_category_assets/dairy-eggs.png" alt="Milk, eggs and dairy"><span>Dairy &amp; eggs</span></div>
+        <div class="splash-tile"><img src="assets/grocery_category_assets/rice-atta-pulses.png" alt="Rice, flour and pulses"><span>Pantry staples</span></div>
+        <div class="splash-tile"><img src="assets/grocery_category_assets/beverages.png" alt="Drinks and beverages"><span>Beverages</span></div>
+        <div class="splash-tile"><img src="assets/grocery_category_assets/household.png" alt="Household cleaning products"><span>Household</span></div>
+        <div class="splash-tile splash-tile-salt"><img src="assets/grocery_category_assets/pink-salt.png" alt="Premium Himalayan Pink Salt"><span>Pink Salt</span></div>
       </div>
-      <div class="splash-scene-caption">Everyday essentials, carefully selected.</div>
+      <div class="splash-category-row" aria-label="Our main categories">
+        <span>Fresh Produce</span><span>Groceries</span><span>Household</span><span>Pink Salt Products</span>
+      </div>
+      <div class="splash-benefits">
+        <span>100% Original Products</span><span>Fast &amp; Reliable Delivery</span><span>Freshness Guaranteed</span><span>Shop Smart &middot; Shop Shakarganj</span>
+        <a href="login.html?tab=login">Already have an account? Sign in</a>
+      </div>
     </div>
   </div>
 </div>
@@ -71,7 +80,6 @@
 
   <section class="hero">
     <div>
-      <div class="eyebrow">Lahore Delivery</div>
       <h1>Your everyday <em>grocery</em>,<br>delivered to your doorstep.</h1>
       <p>Farm-fresh produce, pantry staples and household essentials — hand-picked daily and delivered across Lahore.</p>
       <div class="hero-actions">
@@ -101,7 +109,7 @@
 
   <section class="section" id="shopGrid" style="padding-top:0;">
     <div class="section-head">
-      <h2>Popular this week</h2>
+      <h2 id="productRecommendationTitle">Popular this week</h2>
       <a href="category.html?name=All">View all →</a>
     </div>
     <div class="product-grid" id="productGrid"><p class="empty-note">Loading products…</p></div>
@@ -215,10 +223,10 @@
 
 <script src="js/api.js?v=3"></script>
 <script src="js/ui-dialogs.js?v=1"></script>
-<script src="js/site-settings.js?v=2"></script>
+<script src="js/site-settings.js?v=5"></script>
 <script src="js/support-widget.js?v=3"></script>
-<script src="js/collections.js?v=1"></script>
-<script src="js/category-assets.js?v=1"></script>
-<script src="js/app.js?v=4"></script>
+<script src="js/collections.js?v=2"></script>
+<script src="js/category-assets.js?v=2"></script>
+<script src="js/app.js?v=6"></script>
 </body>
 </html>

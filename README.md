@@ -18,12 +18,9 @@ python app.py
 ```
 
 Then open **http://localhost:5000/** in your browser. Flask serves both the
-API and the frontend on the same port — **there is no separate port or
-origin restriction to worry about**; CORS is wide open (`Access-Control-Allow-
-Origin: *`) and the server binds to `0.0.0.0`, so it's reachable from any
-local address/port. You will never hit the "405 / wrong port" problem that
-happens when a frontend is opened with a separate static file server (like
-VSCode Live Server) instead of through the actual backend.
+API and the frontend from the same origin, so use this server rather than a
+separate static-file server. Cross-origin API access is disabled unless the
+request origin matches the explicitly configured `CORS_ALLOWED_ORIGIN`.
 
 ## Admin login
 
@@ -212,6 +209,77 @@ out deletes that row — the token stops working immediately, not just
 hours. Passwords are hashed with `werkzeug.security` (scrypt) — never stored
 in plain text.
 
+## Product recommendations and personalization
+
+The home page's existing product row is ranked by `GET /api/recommendations`.
+This is a deterministic, lightweight hybrid recommender implemented in
+Python and SQL; it adds no ML dependencies and does not change search, cart,
+pricing, inventory, checkout, or order processing.
+
+### Signals and ranking
+
+- **Popularity fallback:** in-stock products are ranked using valid purchase
+  quantities/order counts and recent product impressions. Anonymous visitors
+  and customers without usable history receive this fallback.
+- **Personal preferences:** for signed-in customer accounts, product views,
+  recommendation impressions, and add-to-cart events are combined with
+  eligible purchase history. Interaction events are limited to the last 180
+  days and use a 45-day recency decay scale; eligible purchases contribute
+  recency-weighted purchase frequency and spend signals.
+- **Category affinity:** customer signals are aggregated by the products'
+  current categories.
+- **Related products:** products appearing with the customer's purchased
+  products in eligible orders receive a co-purchase signal.
+- **Inventory and order validity:** out-of-stock products are excluded.
+  Purchase signals ignore failed, refunded, cancelled, and returned orders;
+  `paid` and `cod_pending` orders are eligible.
+
+Signals are normalized and combined with explicit weights in
+`app/recommendations.py`. The engine evaluates at most 500 in-stock candidates
+and returns up to 24 products per request (the storefront asks for 8). It
+recomputes the ranking from current data on request; there is no scheduled
+training job or precomputed recommendation cache.
+
+### Event collection and privacy
+
+Only authenticated accounts with the customer (`user`) role can submit
+product events. The storefront records product impressions after at least
+25% of a product card becomes visible, and records cart additions with their
+source. Repeated view/impression events for the same customer, product, and
+event type are deduplicated for six hours. Event writes are limited to 300
+per customer per hour.
+
+The `user_product_events` table stores customer ID, product ID, event type,
+and timestamp. It has foreign keys and indexes in both supported database
+schemas; removing a customer or product cascades their associated events.
+Recommendation responses are marked `private, no-store` and use only the
+authenticated customer's signals. Admin analytics return aggregates rather
+than customer-level behavior.
+
+### Recommendation API
+
+| Method and path | Access | Purpose |
+|---|---|---|
+| `GET /api/recommendations?limit=8` | Public; personalized only for a signed-in customer | Returns ranked in-stock products and a `strategy` of `popular` or `personalized`. `limit` must be 1–24. |
+| `POST /api/recommendations/events` | Signed-in customer | Records one supported product interaction. |
+| `GET /api/analytics/recommendations` | Admin or manager | Returns aggregate interaction metrics for the last 30 days. |
+
+Supported event payload:
+
+```json
+{
+  "productId": 42,
+  "eventType": "view"
+}
+```
+
+Supported `eventType` values are `view`, `cart_add`,
+`recommendation_view`, and `recommendation_add`. The server rejects malformed
+events and unavailable products. Analytics include recommendation impressions,
+recommendation additions and add rate, engaged customers, and the most viewed
+recommendation products. These are operational measurements, not offline
+precision/recall scores or proof of recommendation quality.
+
 ## Project structure
 
 ```
@@ -224,13 +292,15 @@ shakarganj-python/
 │   ├── db.py                      DB layer — SQLite + MySQL, dual schema
 │   ├── auth.py                     Password hashing (werkzeug/scrypt)
 │   ├── sessions.py                  Server-side session management
+│   ├── recommendations.py           Hybrid product ranking and preference scoring
 │   ├── payments_jazzcash.py          JazzCash HCP integration
 │   └── routes/
 │       ├── auth.py                    /api/auth/*  (register, login, logout, me)
 │       ├── products.py                 /api/products/*
+│       ├── recommendations.py           /api/recommendations/* (ranking + event collection)
 │       ├── orders.py                    /api/orders/*
 │       ├── payments.py                   /api/payments/* + JazzCash return + sandbox
-│       ├── analytics.py                   /api/analytics/summary
+│       ├── analytics.py                   /api/analytics/* (store + recommendation metrics)
 │       └── support.py                      /api/support/* (FAQs + contact form)
 ├── public/                      Frontend (served by Flask itself)
 │   ├── index.html                Storefront + splash screen
@@ -280,12 +350,14 @@ save to the database as normal, so nothing breaks if you don't set it up.
   Hosted Checkout Page integration (sandbox by default, live once
   configured — request building and secure-hash verification are genuine),
   Help & Support FAQ + contact form (stored in the database, visible in the
-  admin Support Inbox).
-- **Placeholder**: the admin Settings page and Staff & Roles list are UI
-  only (not wired to the database) — flagged in the UI itself.
+  admin Support Inbox), the hybrid recommendation system with customer event
+  collection and aggregate admin metrics, admin settings persistence, and
+  staff/member management subject to role permissions.
+- **Partial / needs evaluation**: recommendations use transparent,
+  rule-weighted signals, not a trained machine-learning model. Recommendation
+  add rate is an early engagement metric; larger datasets and controlled
+  evaluation are needed before claiming recommendation lift.
 - **Your job before launch**: get real JazzCash merchant credentials, point
   `DB_ENGINE` at a real MySQL database if you want one outside SQLite,
   change the seeded demo passwords, and replace stock photos with real
   product photography.
-#   g r o c e r y - w e b  
- 

@@ -72,6 +72,7 @@ def create_app():
     from app.routes.deals import bp as deals_bp
     from app.routes.collections import bp as collections_bp
     from app.routes.notifications import bp as notifications_bp
+    from app.routes.recommendations import bp as recommendations_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(products_bp)
@@ -84,6 +85,7 @@ def create_app():
     app.register_blueprint(deals_bp)
     app.register_blueprint(collections_bp)
     app.register_blueprint(notifications_bp)
+    app.register_blueprint(recommendations_bp)
 
     # ---- Serve the frontend (public/) as static files ----------------------
     @app.route('/', defaults={'path': 'index.html'})

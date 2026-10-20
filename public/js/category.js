@@ -93,7 +93,7 @@ function renderCategoryProducts() {
     return;
   }
   grid.innerHTML = PRODUCTS.map(p => `
-    <div class="p-card">
+    <div class="p-card" ${p.stock > 0 ? `data-product-id="${p.id}" data-event-type="view"` : ''}>
       ${p.deal ? '<div class="tag sale">DEAL</div>' : (p.tag ? `<div class="tag ${p.tag === 'Sale' ? 'sale' : ''}">${escapeHtml(p.tag)}</div>` : (p.has_sale_price ? '<div class="tag sale">SALE</div>' : ''))}
       <div class="img-wrap"><img src="${escapeHtml(p.image || '')}" alt="${escapeHtml(p.name)}"></div>
       <div class="body">
@@ -106,6 +106,7 @@ function renderCategoryProducts() {
       </div>
     </div>
   `).join('');
+  window.observeProductImpressions(grid);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -130,6 +131,7 @@ function saveCart() { localStorage.setItem('sg_cart', JSON.stringify(CART)); }
 
 function addToCart(id) {
   CART[id] = (CART[id] || 0) + 1;
+  window.trackProductInteraction(id, 'cart_add');
   saveCart(); renderCart(); toggleCart(true);
 }
 function changeQty(id, delta) {
