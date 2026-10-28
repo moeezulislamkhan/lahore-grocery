@@ -1,4 +1,3 @@
-const HERO_ROTATION_KEY_PREFIX = 'sg_collection_rotation_start_';
 let FEATURED_COLLECTION = null;
 let HERO_ROTATION_TIMER = null;
 let PROMO_TICKER_RESIZE_OBSERVER = null;
@@ -7,15 +6,10 @@ function renderFeaturedCollectionProducts() {
   const hero = document.getElementById('featuredCollectionHero');
   if (!hero || !FEATURED_COLLECTION) return;
   const products = FEATURED_COLLECTION.products || [];
-  const interval = Math.max(1, Number(FEATURED_COLLECTION.rotation_interval_minutes) || 30) * 60 * 1000;
-  const key = HERO_ROTATION_KEY_PREFIX + FEATURED_COLLECTION.slug;
-  let anchor = Number(localStorage.getItem(key));
-  if (!anchor) {
-    anchor = Date.now();
-    localStorage.setItem(key, String(anchor));
-  }
+  const interval = Math.max(1, Number(FEATURED_COLLECTION.rotation_interval_minutes) || 5) * 60 * 1000;
   const groupCount = Math.max(1, Math.ceil(products.length / 3));
-  const group = Math.floor((Date.now() - anchor) / interval) % groupCount;
+  const now = Date.now();
+  const group = Math.floor(now / interval) % groupCount;
   const start = group * 3;
   const visibleProducts = products.length
     ? Array.from({ length: Math.min(3, products.length) }, (_, slot) => products[(start + slot) % products.length])
@@ -44,7 +38,7 @@ function renderFeaturedCollectionProducts() {
   hero.classList.remove('is-updating');
 
   if (HERO_ROTATION_TIMER) clearTimeout(HERO_ROTATION_TIMER);
-  const nextRotation = interval - ((Date.now() - anchor) % interval);
+  const nextRotation = interval - (now % interval);
   HERO_ROTATION_TIMER = setTimeout(renderFeaturedCollectionProducts, nextRotation + 50);
 }
 

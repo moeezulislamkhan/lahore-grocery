@@ -291,7 +291,7 @@ SCHEMA_SQLITE = [
         title TEXT NOT NULL,
         button_text TEXT NOT NULL DEFAULT 'Explore Collection',
         is_featured INTEGER NOT NULL DEFAULT 0 CHECK(is_featured IN (0,1)),
-        rotation_interval_minutes INTEGER NOT NULL DEFAULT 30,
+        rotation_interval_minutes INTEGER NOT NULL DEFAULT 5,
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now'))
     )""",
@@ -457,7 +457,7 @@ SCHEMA_MYSQL = [
         title VARCHAR(180) NOT NULL,
         button_text VARCHAR(120) NOT NULL DEFAULT 'Explore Collection',
         is_featured TINYINT(1) NOT NULL DEFAULT 0,
-        rotation_interval_minutes INT NOT NULL DEFAULT 30,
+        rotation_interval_minutes INT NOT NULL DEFAULT 5,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",

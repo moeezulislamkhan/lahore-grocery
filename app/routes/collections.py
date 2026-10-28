@@ -45,7 +45,7 @@ def _validate_collection(body, existing=None):
     button_text = str(body.get('button_text', existing.get('button_text', 'Explore Collection') if existing else 'Explore Collection')).strip()
     featured = body.get('is_featured', existing.get('is_featured', 0) if existing else False)
     try:
-        interval = int(body.get('rotation_interval_minutes', existing.get('rotation_interval_minutes', 30) if existing else 30))
+        interval = int(body.get('rotation_interval_minutes', existing.get('rotation_interval_minutes', 5) if existing else 5))
     except (TypeError, ValueError) as exc:
         raise ValueError('Rotation interval must be a whole number of minutes.') from exc
     if not name or not title or not slug:
